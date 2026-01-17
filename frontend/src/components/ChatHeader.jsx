@@ -42,11 +42,10 @@ const ChatHeader = () => {
   };
 
   const handleCloseChat = () => {
+    // Clear the selected user
     setSelectedUser(null);
-    // Force a small delay to ensure state updates properly
-    setTimeout(() => {
-      window.history.pushState({}, '', '/');
-    }, 0);
+    // Refresh the page to ensure clean state
+    window.location.href = '/';
   };
 
   return (
@@ -57,7 +56,7 @@ const ChatHeader = () => {
         onClose={() => setShowProfileModal(false)}
       />
 
-      <div className="sticky top-0 z-20 p-2.5 sm:p-4 border-b border-base-300 bg-base-100/95 backdrop-blur-md shadow-sm">
+      <div className="sticky top-0 z-20 p-2.5 sm:p-4 border-b border-base-300 bg-base-100 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Avatar with online indicator - clickable */}
@@ -83,7 +82,7 @@ const ChatHeader = () => {
             {/* User info */}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <h3 className="font-semibold text-sm sm:text-base truncate max-w-[100px] sm:max-w-[180px]">
+                <h3 className="font-semibold text-sm sm:text-base truncate max-w-[100px] sm:max-w-[180px] text-base-content">
                   {selectedUser.fullName}
                 </h3>
                 {selectedUser.badgeType && selectedUser.badgeType !== "none" && (
@@ -119,7 +118,7 @@ const ChatHeader = () => {
               disabled={!isOnline || isInCall}
               className={`btn btn-circle btn-sm sm:btn-md ${
                 isOnline && !isInCall
-                  ? "btn-ghost hover:bg-primary/20 hover:text-primary"
+                  ? "btn-ghost text-base-content hover:bg-primary/20 hover:text-primary"
                   : "btn-disabled opacity-50"
               }`}
               title="Audio Call"
@@ -135,7 +134,7 @@ const ChatHeader = () => {
               disabled={!isOnline || isInCall}
               className={`btn btn-circle btn-sm sm:btn-md ${
                 isOnline && !isInCall
-                  ? "btn-ghost hover:bg-primary/20 hover:text-primary"
+                  ? "btn-ghost text-base-content hover:bg-primary/20 hover:text-primary"
                   : "btn-disabled opacity-50"
               }`}
               title="Video Call"
@@ -148,7 +147,8 @@ const ChatHeader = () => {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleCloseChat}
-              className="btn btn-circle btn-sm sm:btn-md btn-ghost hover:bg-error/20 hover:text-error"
+              className="btn btn-circle btn-sm sm:btn-md btn-ghost text-base-content hover:bg-error/20 hover:text-error"
+              title="Close chat"
             >
               <X className="size-4 sm:size-5" />
             </motion.button>

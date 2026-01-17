@@ -158,68 +158,101 @@ const checkMediaPermissions = async (audio = true, video = false) => {
   }
 };
 
-// Get media stream with better error handling and permission prompts
+// Get media stream with simplified and robust error handling
 const getMediaStream = async (constraints) => {
-  try {
-    // First, ensure we have permission by requesting with basic constraints
-    // This helps trigger the browser permission prompt properly
-    if (constraints.video) {
-      try {
-        // Try to get video permission first with minimal constraints
-        const testStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        testStream.getTracks().forEach(track => track.stop());
-      } catch (videoErr) {
-        console.log("Video permission check failed:", videoErr.name);
-        // If video fails, we'll handle it below
-      }
-    }
-    
-    if (constraints.audio) {
-      try {
-        // Try to get audio permission with minimal constraints
-        const testStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        testStream.getTracks().forEach(track => track.stop());
-      } catch (audioErr) {
-        console.log("Audio permission check failed:", audioErr.name);
-      }
-    }
-    
-    // Now try to get the actual stream with full constraints
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    return { stream, error: null };
-  } catch (error) {
-    console.error("Media access error:", error.name, error.message);
-    let errorMessage = "Could not access media devices";
-    
-    if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-      // Check if it's a user dismissal vs actual denial
-      errorMessage = "Camera/microphone access denied. Please click the camera icon in your browser's address bar to allow access, then try again.";
-    } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-      errorMessage = "No camera/microphone found. Please connect a device and try again.";
-    } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
-      errorMessage = "Camera/microphone is being used by another app. Please close other apps and try again.";
-    } else if (error.name === "OverconstrainedError") {
-      // Try again with less strict constraints
-      try {
-        const fallbackConstraints = {
-          audio: constraints.audio ? { echoCancellation: true } : false,
-          video: constraints.video ? { facingMode: "user" } : false,
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
-        return { stream, error: null };
-      } catch (e) {
-        errorMessage = "Camera doesn't support the requested settings.";
-      }
-    } else if (error.name === "TypeError") {
-      errorMessage = "No media devices available on this device.";
-    } else if (error.name === "AbortError") {
-      errorMessage = "Something went wrong. Please try again.";
-    } else if (error.name === "SecurityError") {
-      errorMessage = "Media access blocked due to security settings. Please use HTTPS.";
-    }
-    
-    return { stream: null, error: errorMessage };
+  // Check if mediaDevices API is available
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    return { 
+      stream: null, 
+      error: "Your browser doesn't support media devices. Please use a modern browser." 
+    };
   }
+
+  // Helper to try getting stream with fallback
+  const tryGetStream = async (primaryConstraints, fallbackConstraints = null) => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
+      return { stream, error: null };
+    } catch (err) {
+      console.log("Primary constraints failed:", err.name, err.message);
+      
+      // Try fallback if provided
+      if (fallbackConstraints) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+          return { stream, error: null };
+        } catch (fallbackErr) {
+          console.log("Fallback constraints also failed:", fallbackErr.name);
+          return { stream: null, error: fallbackErr };
+        }
+      }
+      return { stream: null, error: err };
+    }
+  };
+
+  // Simplify constraints for maximum compatibility
+  const simpleConstraints = {
+    audio: constraints.audio ? true : false,
+    video: constraints.video ? true : false,
+  };
+
+  // Even simpler fallback - audio only
+  const audioOnlyConstraints = {
+    audio: true,
+    video: false,
+  };
+
+  // Try with simple constraints first
+  let result = await tryGetStream(simpleConstraints);
+  
+  // If that failed with video, try audio only
+  if (!result.stream && constraints.video && constraints.audio) {
+    console.log("Trying audio only...");
+    result = await tryGetStream(audioOnlyConstraints);
+    if (result.stream) {
+      return { stream: result.stream, error: null, audioOnly: true };
+    }
+  }
+
+  // If we got a stream, return it
+  if (result.stream) {
+    return { stream: result.stream, error: null };
+  }
+
+  // Handle the error
+  const error = result.error;
+  let errorMessage = "Could not access media devices";
+  
+  switch (error.name) {
+    case "NotAllowedError":
+    case "PermissionDeniedError":
+      errorMessage = "Permission denied. Please allow camera/microphone access in your browser settings and reload the page.";
+      break;
+    case "NotFoundError":
+    case "DevicesNotFoundError":
+      errorMessage = "No camera or microphone found. Please connect a device.";
+      break;
+    case "NotReadableError":
+    case "TrackStartError":
+      errorMessage = "Camera/microphone is in use by another application.";
+      break;
+    case "OverconstrainedError":
+      errorMessage = "Your device doesn't support the required media settings.";
+      break;
+    case "TypeError":
+      errorMessage = "No media devices available.";
+      break;
+    case "SecurityError":
+      errorMessage = "Media access blocked. Please use HTTPS.";
+      break;
+    case "AbortError":
+      errorMessage = "Media request was cancelled. Please try again.";
+      break;
+    default:
+      errorMessage = `Media error: ${error.message || error.name}`;
+  }
+  
+  return { stream: null, error: errorMessage };
 };
 
 export const useCallStore = create((set, get) => ({
@@ -268,40 +301,52 @@ export const useCallStore = create((set, get) => ({
     }
 
     try {
-      // For audio calls, only request audio permission
-      // For video calls, try video first, but fallback to audio-only if camera fails
+      // Determine what media to request
       const isVideoCall = type === 'video';
-      let constraints = getMediaConstraints(type, lowDataMode, isVideoCall);
+      let actualCallType = type;
+      
+      // Get media stream with simple constraints
+      const constraints = {
+        audio: true,
+        video: isVideoCall,
+      };
+      
+      console.log("Requesting media with constraints:", constraints);
       
       // Try to get media stream
-      let { stream, error } = await getMediaStream(constraints);
+      let result = await getMediaStream(constraints);
       
-      // If video call failed to get camera, try audio only
-      if (!stream && isVideoCall) {
+      // Check if we got audio-only fallback for video call
+      if (result.audioOnly && isVideoCall) {
         toast("Camera not available, starting audio-only call", { icon: "🎤" });
-        constraints = getMediaConstraints('audio', lowDataMode);
-        const fallbackResult = await getMediaStream(constraints);
-        stream = fallbackResult.stream;
-        error = fallbackResult.error;
-        
-        // Switch to audio call type
-        if (stream) {
-          type = 'audio';
+        actualCallType = 'audio';
+      }
+      
+      // If still no stream, try audio-only explicitly
+      if (!result.stream && isVideoCall) {
+        console.log("Video failed, trying audio only...");
+        result = await getMediaStream({ audio: true, video: false });
+        if (result.stream) {
+          toast("Camera not available, starting audio-only call", { icon: "🎤" });
+          actualCallType = 'audio';
         }
       }
       
-      if (!stream) {
-        toast.error(error || "Could not access microphone");
+      if (!result.stream) {
+        toast.error(result.error || "Could not access microphone. Please check permissions.");
         return;
       }
       
+      const stream = result.stream;
+      console.log("Got media stream with tracks:", stream.getTracks().map(t => t.kind));
+      
       set({
         callStatus: "calling",
-        callType: type,
+        callType: actualCallType,
         receiver: receiverUser,
         localStream: stream,
         reconnectAttempts: 0,
-        isVideoOff: type === 'audio',
+        isVideoOff: actualCallType === 'audio',
       });
 
       const peer = new Peer({
@@ -318,7 +363,7 @@ export const useCallStore = create((set, get) => ({
           from: authUser._id,
           callerName: authUser.fullName,
           callerPic: authUser.profilePic,
-          callType: type,
+          callType: actualCallType,
         });
       });
 
