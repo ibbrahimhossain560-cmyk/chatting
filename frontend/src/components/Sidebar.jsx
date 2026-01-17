@@ -1,40 +1,179 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
-import { Users, Bell, BellOff, Search, X } from "lucide-react";
+import { Users, Bell, BellOff, Search, X, Archive, Trash2, Pin, PinOff, VolumeX, Volume2, MoreVertical, ArchiveRestore } from "lucide-react";
 import { notificationManager } from "../lib/notifications";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, useAnimation } from "framer-motion";
 import Badge from "./Badge";
+import toast from "react-hot-toast";
 
 const Sidebar = () => {
-  const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
+  const { 
+    getUsers, 
+    users, 
+    selectedUser, 
+    setSelectedUser, 
+    isUsersLoading,
+    archivedUsers,
+    archiveChat,
+    unarchiveChat,
+    deleteChat,
+    pinChat,
+    unpinChat,
+    muteChat,
+    unmuteChat,
+    pinnedUsers,
+    mutedUsers,
+  } = useChatStore();
 
   const { onlineUsers } = useAuthStore();
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     notificationManager.isPermissionGranted()
   );
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, user: null });
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const contextMenuRef = useRef(null);
 
   useEffect(() => {
     getUsers();
   }, [getUsers]);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        setContextMenu({ visible: false, x: 0, y: 0, user: null });
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, []);
 
   const handleToggleNotifications = async () => {
     if (!notificationsEnabled) {
       const granted = await notificationManager.requestPermission();
       setNotificationsEnabled(granted);
     } else {
-      // Can't programmatically disable, just update state
       setNotificationsEnabled(false);
     }
   };
 
+  const handleContextMenu = (e, user) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      visible: true,
+      x: e.clientX || e.touches?.[0]?.clientX || 0,
+      y: e.clientY || e.touches?.[0]?.clientY || 0,
+      user,
+    });
+  };
+
+  const handleLongPress = (user) => {
+    // Vibrate for feedback if supported
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+    setContextMenu({
+      visible: true,
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+      user,
+    });
+  };
+
+  const handleArchive = async (userId) => {
+    try {
+      await archiveChat(userId);
+      toast.success("Chat archived");
+      if (selectedUser?._id === userId) {
+        setSelectedUser(null);
+      }
+    } catch (error) {
+      toast.error("Failed to archive chat");
+    }
+    setContextMenu({ visible: false, x: 0, y: 0, user: null });
+  };
+
+  const handleUnarchive = async (userId) => {
+    try {
+      await unarchiveChat(userId);
+      toast.success("Chat unarchived");
+    } catch (error) {
+      toast.error("Failed to unarchive chat");
+    }
+    setContextMenu({ visible: false, x: 0, y: 0, user: null });
+  };
+
+  const handleDelete = async (userId) => {
+    try {
+      await deleteChat(userId);
+      toast.success("Chat deleted");
+      if (selectedUser?._id === userId) {
+        setSelectedUser(null);
+      }
+      setDeleteConfirm(null);
+    } catch (error) {
+      toast.error("Failed to delete chat");
+    }
+    setContextMenu({ visible: false, x: 0, y: 0, user: null });
+  };
+
+  const handlePin = async (userId) => {
+    try {
+      if (pinnedUsers.includes(userId)) {
+        await unpinChat(userId);
+        toast.success("Chat unpinned");
+      } else {
+        await pinChat(userId);
+        toast.success("Chat pinned");
+      }
+    } catch (error) {
+      toast.error("Failed to update pin status");
+    }
+    setContextMenu({ visible: false, x: 0, y: 0, user: null });
+  };
+
+  const handleMute = async (userId) => {
+    try {
+      if (mutedUsers.includes(userId)) {
+        await unmuteChat(userId);
+        toast.success("Notifications enabled");
+      } else {
+        await muteChat(userId);
+        toast.success("Chat muted");
+      }
+    } catch (error) {
+      toast.error("Failed to update mute status");
+    }
+    setContextMenu({ visible: false, x: 0, y: 0, user: null });
+  };
+
+  // Filter users based on archived state
   const filteredUsers = users.filter((user) => {
+    const isArchived = archivedUsers.includes(user._id);
+    if (showArchived !== isArchived) return false;
+    
     const matchesOnline = showOnlineOnly ? onlineUsers.includes(user._id) : true;
     const matchesSearch = user.fullName.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesOnline && matchesSearch;
+  });
+
+  // Sort users: pinned first, then by name
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    const aPinned = pinnedUsers.includes(a._id);
+    const bPinned = pinnedUsers.includes(b._id);
+    if (aPinned && !bPinned) return -1;
+    if (!aPinned && bPinned) return 1;
+    return a.fullName.localeCompare(b.fullName);
   });
 
   if (isUsersLoading) return <SidebarSkeleton />;
@@ -107,91 +246,380 @@ const Sidebar = () => {
               {notificationsEnabled ? 'On' : 'Off'}
             </span>
           </button>
+
+          {/* Archive toggle */}
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              showArchived 
+                ? 'bg-warning/20 text-warning' 
+                : 'bg-base-200/50 text-base-content/70 hover:bg-base-300'
+            }`}
+          >
+            <Archive className="size-3" />
+            <span className="hidden sm:inline">
+              {showArchived ? 'Archived' : 'Archive'}
+            </span>
+          </button>
         </div>
       </div>
 
       {/* Users list */}
       <div className="overflow-y-auto flex-1 py-2">
         <AnimatePresence>
-          {filteredUsers.map((user, index) => (
-            <motion.button
+          {sortedUsers.map((user, index) => (
+            <SwipeableUserItem
               key={user._id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ delay: index * 0.05 }}
-              onClick={() => setSelectedUser(user)}
-              className={`
-                w-full p-3 lg:p-4 flex items-center gap-3
-                hover:bg-base-200/70 transition-all duration-200
-                ${selectedUser?._id === user._id 
-                  ? "bg-primary/10 border-l-4 border-primary" 
-                  : "border-l-4 border-transparent"
-                }
-              `}
-            >
-              {/* Avatar with online indicator */}
-              <div className="relative flex-shrink-0">
-                <div className={`w-12 h-12 lg:w-14 lg:h-14 rounded-full overflow-hidden ring-2 ring-offset-2 ring-offset-base-100 ${
-                  onlineUsers.includes(user._id) ? 'ring-green-500' : 'ring-base-300'
-                }`}>
-                  <img
-                    src={user.profilePic || "/avatar.png"}
-                    alt={user.fullName}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                {onlineUsers.includes(user._id) && (
-                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full ring-2 ring-base-100 online-indicator" />
-                )}
-              </div>
-
-              {/* User info */}
-              <div className="flex-1 text-left min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <h3 className="font-semibold truncate">{user.fullName}</h3>
-                  <Badge badgeType={user.badgeType} size="xs" />
-                  {user.isPremium && (
-                    <span className="text-xs">✨</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      onlineUsers.includes(user._id) ? "bg-green-500" : "bg-gray-400"
-                    }`}
-                  />
-                  <p className="text-sm text-base-content/60 truncate">
-                    {onlineUsers.includes(user._id) ? "Active now" : "Offline"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Unread badge placeholder */}
-              {/* {user.unreadCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-primary text-primary-content text-xs flex items-center justify-center font-bold">
-                  {user.unreadCount}
-                </span>
-              )} */}
-            </motion.button>
+              user={user}
+              index={index}
+              selectedUser={selectedUser}
+              setSelectedUser={setSelectedUser}
+              onlineUsers={onlineUsers}
+              pinnedUsers={pinnedUsers}
+              mutedUsers={mutedUsers}
+              archivedUsers={archivedUsers}
+              showArchived={showArchived}
+              onContextMenu={handleContextMenu}
+              onLongPress={handleLongPress}
+              onArchive={handleArchive}
+              onUnarchive={handleUnarchive}
+            />
           ))}
         </AnimatePresence>
 
-        {filteredUsers.length === 0 && (
+        {sortedUsers.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className="text-center py-8 px-4"
           >
-            <Users className="size-12 mx-auto text-base-content/20 mb-3" />
-            <p className="text-base-content/60 font-medium">No users found</p>
-            <p className="text-sm text-base-content/40 mt-1">
-              {searchQuery ? "Try a different search" : showOnlineOnly ? "No one is online" : ""}
-            </p>
+            {showArchived ? (
+              <>
+                <Archive className="size-12 mx-auto text-base-content/20 mb-3" />
+                <p className="text-base-content/60 font-medium">No archived chats</p>
+                <p className="text-sm text-base-content/40 mt-1">
+                  Swipe left on a chat to archive it
+                </p>
+              </>
+            ) : (
+              <>
+                <Users className="size-12 mx-auto text-base-content/20 mb-3" />
+                <p className="text-base-content/60 font-medium">No users found</p>
+                <p className="text-sm text-base-content/40 mt-1">
+                  {searchQuery ? "Try a different search" : showOnlineOnly ? "No one is online" : ""}
+                </p>
+              </>
+            )}
           </motion.div>
         )}
       </div>
+
+      {/* Context Menu */}
+      <AnimatePresence>
+        {contextMenu.visible && contextMenu.user && (
+          <motion.div
+            ref={contextMenuRef}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed z-[100] bg-base-100 rounded-xl shadow-2xl border border-base-300 overflow-hidden min-w-[200px]"
+            style={{
+              top: Math.min(contextMenu.y, window.innerHeight - 280),
+              left: Math.min(contextMenu.x, window.innerWidth - 220),
+            }}
+          >
+            <div className="p-3 border-b border-base-300">
+              <div className="flex items-center gap-3">
+                <img
+                  src={contextMenu.user.profilePic || "/avatar.png"}
+                  alt={contextMenu.user.fullName}
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+                <div>
+                  <p className="font-semibold truncate">{contextMenu.user.fullName}</p>
+                  <p className="text-xs text-base-content/60">Options</p>
+                </div>
+              </div>
+            </div>
+            <div className="py-1">
+              {/* Pin/Unpin */}
+              <button
+                onClick={() => handlePin(contextMenu.user._id)}
+                className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-base-200 transition-colors"
+              >
+                {pinnedUsers.includes(contextMenu.user._id) ? (
+                  <>
+                    <PinOff className="size-4 text-base-content/70" />
+                    <span>Unpin chat</span>
+                  </>
+                ) : (
+                  <>
+                    <Pin className="size-4 text-base-content/70" />
+                    <span>Pin chat</span>
+                  </>
+                )}
+              </button>
+
+              {/* Mute/Unmute */}
+              <button
+                onClick={() => handleMute(contextMenu.user._id)}
+                className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-base-200 transition-colors"
+              >
+                {mutedUsers.includes(contextMenu.user._id) ? (
+                  <>
+                    <Volume2 className="size-4 text-base-content/70" />
+                    <span>Unmute notifications</span>
+                  </>
+                ) : (
+                  <>
+                    <VolumeX className="size-4 text-base-content/70" />
+                    <span>Mute notifications</span>
+                  </>
+                )}
+              </button>
+
+              {/* Archive/Unarchive */}
+              {showArchived ? (
+                <button
+                  onClick={() => handleUnarchive(contextMenu.user._id)}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-base-200 transition-colors"
+                >
+                  <ArchiveRestore className="size-4 text-base-content/70" />
+                  <span>Unarchive chat</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleArchive(contextMenu.user._id)}
+                  className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-base-200 transition-colors"
+                >
+                  <Archive className="size-4 text-warning" />
+                  <span>Archive chat</span>
+                </button>
+              )}
+
+              {/* Delete */}
+              <button
+                onClick={() => setDeleteConfirm(contextMenu.user)}
+                className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-error/10 transition-colors text-error"
+              >
+                <Trash2 className="size-4" />
+                <span>Delete chat</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] bg-black/50 flex items-center justify-center p-4"
+            onClick={() => setDeleteConfirm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-base-100 rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold mb-2">Delete Chat?</h3>
+              <p className="text-base-content/70 mb-6">
+                This will delete your chat history with <span className="font-semibold">{deleteConfirm.fullName}</span>. 
+                This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="btn btn-ghost flex-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(deleteConfirm._id)}
+                  className="btn btn-error flex-1"
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </aside>
   );
 };
+
+// Swipeable User Item Component
+const SwipeableUserItem = ({
+  user,
+  index,
+  selectedUser,
+  setSelectedUser,
+  onlineUsers,
+  pinnedUsers,
+  mutedUsers,
+  archivedUsers,
+  showArchived,
+  onContextMenu,
+  onLongPress,
+  onArchive,
+  onUnarchive,
+}) => {
+  const x = useMotionValue(0);
+  const controls = useAnimation();
+  const [isDragging, setIsDragging] = useState(false);
+  const longPressTimer = useRef(null);
+  const isPinned = pinnedUsers.includes(user._id);
+  const isMuted = mutedUsers.includes(user._id);
+
+  // Transform for background color based on swipe direction
+  const bgColor = useTransform(
+    x,
+    [-100, 0, 100],
+    showArchived 
+      ? ["rgb(34, 197, 94)", "transparent", "rgb(239, 68, 68)"]
+      : ["rgb(245, 158, 11)", "transparent", "rgb(239, 68, 68)"]
+  );
+
+  const handleDragEnd = async () => {
+    const xVal = x.get();
+    if (xVal < -80) {
+      // Swipe left - archive/unarchive
+      if (showArchived) {
+        await onUnarchive(user._id);
+      } else {
+        await onArchive(user._id);
+      }
+    }
+    controls.start({ x: 0 });
+  };
+
+  const handleTouchStart = () => {
+    longPressTimer.current = setTimeout(() => {
+      if (!isDragging) {
+        onLongPress(user);
+      }
+    }, 500);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -100 }}
+      transition={{ delay: index * 0.03 }}
+      className="relative overflow-hidden"
+    >
+      {/* Background action indicator */}
+      <motion.div
+        className="absolute inset-0 flex items-center justify-end px-4"
+        style={{ backgroundColor: bgColor }}
+      >
+        {showArchived ? (
+          <ArchiveRestore className="size-6 text-white" />
+        ) : (
+          <Archive className="size-6 text-white" />
+        )}
+      </motion.div>
+
+      {/* Swipeable content */}
+      <motion.button
+        drag="x"
+        dragConstraints={{ left: -100, right: 0 }}
+        dragElastic={0.1}
+        onDragStart={() => setIsDragging(true)}
+        onDragEnd={handleDragEnd}
+        onDrag={() => {
+          if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+          }
+        }}
+        animate={controls}
+        style={{ x }}
+        onContextMenu={(e) => onContextMenu(e, user)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onMouseDown={handleTouchStart}
+        onMouseUp={handleTouchEnd}
+        onMouseLeave={handleTouchEnd}
+        onClick={() => {
+          if (!isDragging) {
+            setSelectedUser(user);
+          }
+          setIsDragging(false);
+        }}
+        className={`
+          w-full p-3 lg:p-4 flex items-center gap-3 bg-base-100
+          hover:bg-base-200/70 transition-all duration-200
+          ${selectedUser?._id === user._id 
+            ? "bg-primary/10 border-l-4 border-primary" 
+            : "border-l-4 border-transparent"
+          }
+        `}
+      >
+        {/* Avatar with online indicator */}
+        <div className="relative flex-shrink-0">
+          <div className={`w-12 h-12 lg:w-14 lg:h-14 rounded-full overflow-hidden ring-2 ring-offset-2 ring-offset-base-100 ${
+            onlineUsers.includes(user._id) ? 'ring-green-500' : 'ring-base-300'
+          }`}>
+            <img
+              src={user.profilePic || "/avatar.png"}
+              alt={user.fullName}
+              className="w-full h-full object-cover"
+            />
+          </div>
+          {onlineUsers.includes(user._id) && (
+            <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full ring-2 ring-base-100 online-indicator" />
+          )}
+        </div>
+
+        {/* User info */}
+        <div className="flex-1 text-left min-w-0">
+          <div className="flex items-center gap-1.5">
+            {isPinned && <Pin className="size-3 text-primary" />}
+            <h3 className="font-semibold truncate">{user.fullName}</h3>
+            <Badge badgeType={user.badgeType} size="xs" />
+            {user.isPremium && (
+              <span className="text-xs">✨</span>
+            )}
+            {isMuted && <VolumeX className="size-3 text-base-content/40" />}
+          </div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                onlineUsers.includes(user._id) ? "bg-green-500" : "bg-gray-400"
+              }`}
+            />
+            <p className="text-sm text-base-content/60 truncate">
+              {onlineUsers.includes(user._id) ? "Active now" : "Offline"}
+            </p>
+          </div>
+        </div>
+
+        {/* More options button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onContextMenu(e, user);
+          }}
+          className="p-2 rounded-full hover:bg-base-300 transition-colors"
+        >
+          <MoreVertical className="size-4 text-base-content/60" />
+        </button>
+      </motion.button>
+    </motion.div>
+  );
+};
+
 export default Sidebar;

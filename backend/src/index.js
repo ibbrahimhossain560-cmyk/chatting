@@ -12,6 +12,7 @@ import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
 import adminRoutes from "./routes/admin.route.js";
 import nicknameRoutes from "./routes/nickname.route.js";
+import conversationRoutes from "./routes/conversation.route.js";
 import { app, server } from "./lib/socket.js";
 
 // Load environment variables
@@ -39,6 +40,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/nicknames", nicknameRoutes);
+app.use("/api/conversations", conversationRoutes);
 
 if (process.env.NODE_ENV === "production") {
   // In production on Render, frontend is built at root/frontend/dist

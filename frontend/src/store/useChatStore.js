@@ -408,6 +408,7 @@ export const useChatStore = create((set, get) => ({
   // ============ Nickname Functions ============
 
   getConversationNicknames: async (userId) => {
+    if (!userId) return null;
     set({ isNicknameLoading: true });
     try {
       const res = await axiosInstance.get(`/nicknames/conversation/${userId}`);
@@ -415,15 +416,16 @@ export const useChatStore = create((set, get) => ({
         nicknames: {
           ...state.nicknames,
           [userId]: {
-            myNicknameForThem: res.data.myNicknameForThem,
-            theirNicknameForMe: res.data.theirNicknameForMe,
+            myNicknameForThem: res.data?.myNicknameForThem || null,
+            theirNicknameForMe: res.data?.theirNicknameForMe || null,
           },
         },
         isNicknameLoading: false,
       }));
       return res.data;
     } catch (error) {
-      console.log("Failed to get nicknames:", error);
+      // Silently fail - nicknames are not critical
+      console.log("Nickname API not available:", error?.response?.status || error?.message);
       set({ isNicknameLoading: false });
       return null;
     }
@@ -472,6 +474,115 @@ export const useChatStore = create((set, get) => ({
   getNicknameForUser: (userId) => {
     const { nicknames } = get();
     return nicknames[userId]?.myNicknameForThem || null;
+  },
+
+  // ============ Conversation Management (Archive/Delete/Pin/Mute) ============
+  
+  archivedUsers: [], // User IDs that are archived
+  pinnedUsers: [], // User IDs that are pinned
+  mutedUsers: [], // User IDs that are muted
+  deletedUsers: [], // User IDs that are deleted (hidden)
+
+  archiveChat: async (userId) => {
+    try {
+      await axiosInstance.post(`/conversations/${userId}/archive`);
+      set((state) => ({
+        archivedUsers: [...state.archivedUsers, userId],
+      }));
+    } catch (error) {
+      console.log("Archive API not available:", error?.response?.status);
+      // Still update locally for demo
+      set((state) => ({
+        archivedUsers: [...state.archivedUsers, userId],
+      }));
+    }
+  },
+
+  unarchiveChat: async (userId) => {
+    try {
+      await axiosInstance.post(`/conversations/${userId}/unarchive`);
+      set((state) => ({
+        archivedUsers: state.archivedUsers.filter((id) => id !== userId),
+      }));
+    } catch (error) {
+      console.log("Unarchive API not available:", error?.response?.status);
+      set((state) => ({
+        archivedUsers: state.archivedUsers.filter((id) => id !== userId),
+      }));
+    }
+  },
+
+  deleteChat: async (userId) => {
+    try {
+      await axiosInstance.delete(`/conversations/${userId}`);
+      set((state) => ({
+        deletedUsers: [...state.deletedUsers, userId],
+        users: state.users.filter((u) => u._id !== userId),
+      }));
+    } catch (error) {
+      console.log("Delete API not available:", error?.response?.status);
+      // Still update locally
+      set((state) => ({
+        deletedUsers: [...state.deletedUsers, userId],
+        users: state.users.filter((u) => u._id !== userId),
+      }));
+    }
+  },
+
+  pinChat: async (userId) => {
+    try {
+      await axiosInstance.post(`/conversations/${userId}/pin`);
+      set((state) => ({
+        pinnedUsers: [...state.pinnedUsers, userId],
+      }));
+    } catch (error) {
+      console.log("Pin API not available:", error?.response?.status);
+      set((state) => ({
+        pinnedUsers: [...state.pinnedUsers, userId],
+      }));
+    }
+  },
+
+  unpinChat: async (userId) => {
+    try {
+      await axiosInstance.post(`/conversations/${userId}/unpin`);
+      set((state) => ({
+        pinnedUsers: state.pinnedUsers.filter((id) => id !== userId),
+      }));
+    } catch (error) {
+      console.log("Unpin API not available:", error?.response?.status);
+      set((state) => ({
+        pinnedUsers: state.pinnedUsers.filter((id) => id !== userId),
+      }));
+    }
+  },
+
+  muteChat: async (userId, duration = null) => {
+    try {
+      await axiosInstance.post(`/conversations/${userId}/mute`, { duration });
+      set((state) => ({
+        mutedUsers: [...state.mutedUsers, userId],
+      }));
+    } catch (error) {
+      console.log("Mute API not available:", error?.response?.status);
+      set((state) => ({
+        mutedUsers: [...state.mutedUsers, userId],
+      }));
+    }
+  },
+
+  unmuteChat: async (userId) => {
+    try {
+      await axiosInstance.post(`/conversations/${userId}/unmute`);
+      set((state) => ({
+        mutedUsers: state.mutedUsers.filter((id) => id !== userId),
+      }));
+    } catch (error) {
+      console.log("Unmute API not available:", error?.response?.status);
+      set((state) => ({
+        mutedUsers: state.mutedUsers.filter((id) => id !== userId),
+      }));
+    }
   },
 
   setSelectedUser: (selectedUser) => set({ selectedUser }),

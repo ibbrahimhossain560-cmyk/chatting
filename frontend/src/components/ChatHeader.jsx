@@ -16,18 +16,28 @@ const ChatHeader = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNicknameModal, setShowNicknameModal] = useState(false);
 
+  // Early return if no selected user
+  if (!selectedUser) return null;
+
   const isOnline = onlineUsers.includes(selectedUser._id);
   const isInCall = callStatus !== "idle";
   
-  // Get nickname for this user
-  const userNickname = nicknames[selectedUser._id]?.myNicknameForThem;
+  // Get nickname for this user (safely)
+  const userNickname = nicknames?.[selectedUser._id]?.myNicknameForThem || null;
 
-  // Fetch nicknames when selected user changes
+  // Fetch nicknames when selected user changes (wrapped in try-catch)
   useEffect(() => {
-    if (selectedUser?._id) {
-      getConversationNicknames(selectedUser._id);
-    }
-  }, [selectedUser?._id, getConversationNicknames]);
+    const fetchNicknames = async () => {
+      if (selectedUser?._id && getConversationNicknames) {
+        try {
+          await getConversationNicknames(selectedUser._id);
+        } catch (err) {
+          console.log("Could not fetch nicknames:", err);
+        }
+      }
+    };
+    fetchNicknames();
+  }, [selectedUser?._id]);
 
   const handleAudioCall = () => {
     if (!isOnline) {
