@@ -1,0 +1,6 @@
+CLOUDINARY_API_KEY=256239944756157
+CLOUDINARY_API_SECRET=SPczWqEyLpSJ7b5OEGpJY3JA5OY
+CLOUDINARY_CLOUD_NAME=dkujoguge
+JWT_SECRET="s3cR3t!@#9xPzA$%&*LmQwT7^vGhJk"
+MONGODB_URI="mongodb+srv://nafij:nafij@cluster0.8pr5g.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+PORT=5001

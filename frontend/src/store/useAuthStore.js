@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 import { notificationManager } from "../lib/notifications";
 import { useNotificationStore } from "./useNotificationStore";
+import { useCallStore } from "./useCallStore";
 
 const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:5001" : "/";
 
@@ -125,6 +126,36 @@ export const useAuthStore = create((set, get) => ({
         );
       }
     });
+
+    // ============ WebRTC Call Event Listeners ============
+
+    // Handle incoming call
+    socket.on("incomingCall", (data) => {
+      useCallStore.getState().handleIncomingCall(data);
+    });
+
+    // Handle call accepted
+    socket.on("callAccepted", (signal) => {
+      useCallStore.getState().handleCallAccepted(signal);
+    });
+
+    // Handle call rejected
+    socket.on("callRejected", () => {
+      useCallStore.getState().handleCallRejected();
+    });
+
+    // Handle call ended
+    socket.on("callEnded", () => {
+      useCallStore.getState().handleCallEnded();
+    });
+
+    // Handle call failed (user offline)
+    socket.on("callFailed", (data) => {
+      toast.error(data.reason || "Call failed");
+      useCallStore.getState().cleanupCall();
+    });
+
+    // ============ End WebRTC Call Event Listeners ============
   },
 
   disconnectSocket: () => {

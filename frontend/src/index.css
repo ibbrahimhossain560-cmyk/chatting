@@ -1,3 +1,333 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-base-content/20 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-base-content/40;
+}
+
+/* Hide scrollbar for Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+/* Smooth transitions */
+* {
+  @apply transition-colors duration-200;
+}
+
+/* Glass effect utility */
+.glass-effect {
+  @apply backdrop-blur-lg bg-base-100/80;
+}
+
+/* Message bubble animations */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.chat .chat-bubble {
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+/* Typing indicator animation */
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+.typing-indicator span {
+  animation: typingBounce 1.4s infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Pulse animation for online indicator */
+@keyframes onlinePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+}
+
+.online-indicator {
+  animation: onlinePulse 2s infinite;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Slide up animation */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+/* Scale in animation */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s ease-out;
+}
+
+/* Gradient text */
+.gradient-text {
+  @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+}
+
+/* Card hover effect */
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+}
+
+/* Button shine effect */
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}
+
+.btn-shine {
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: shine 3s infinite;
+}
+
+/* Mobile-first responsive utilities */
+@layer utilities {
+  /* Safe area padding for notched devices */
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Touch-friendly tap targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* No text selection for UI elements */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Hide on mobile */
+  .hide-mobile {
+    @apply hidden sm:block;
+  }
+
+  /* Show on mobile only */
+  .show-mobile {
+    @apply block sm:hidden;
+  }
+}
+
+/* Mobile drawer animation */
+@keyframes drawerSlideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.drawer-slide-in {
+  animation: drawerSlideIn 0.3s ease-out;
+}
+
+/* Ripple effect for buttons */
+@keyframes ripple {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  animation: ripple 0.6s linear;
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Call ring animation */
+@keyframes callRing {
+  0% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(15deg);
+  }
+  20% {
+    transform: rotate(-15deg);
+  }
+  30% {
+    transform: rotate(15deg);
+  }
+  40% {
+    transform: rotate(-15deg);
+  }
+  50% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-call-ring {
+  animation: callRing 1s ease-in-out infinite;
+}
+
+/* Gradient border */
+.gradient-border {
+  @apply relative;
+}
+
+.gradient-border::before {
+  content: "";
+  @apply absolute inset-0 rounded-lg p-[2px];
+  background: linear-gradient(135deg, hsl(var(--p)), hsl(var(--s)));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Input focus glow */
+.input-glow:focus {
+  @apply ring-2 ring-primary/50 ring-offset-2 ring-offset-base-100;
+}
+
+/* Avatar status ring */
+.avatar-online {
+  @apply ring-2 ring-green-500 ring-offset-2 ring-offset-base-100;
+}
+
+.avatar-offline {
+  @apply ring-2 ring-gray-400 ring-offset-2 ring-offset-base-100;
+}
+
+/* Skeleton loading animation */
+@keyframes skeletonPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.skeleton-pulse {
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+/* Mobile-optimized message input */
+@media (max-width: 640px) {
+  .message-input-container {
+    @apply fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 p-2;
+    padding-bottom: env(safe-area-inset-bottom, 8px);
+  }
+}
+
+/* Prevent iOS bounce */
+html {
+  overscroll-behavior: none;
+}
+
+/* Better touch feedback */
+button, a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active {
+  @apply scale-95;
+}
+

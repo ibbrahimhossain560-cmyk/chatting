@@ -11,6 +11,8 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { useEffect } from "react";
 import NotificationPermission from "./components/NotificationPermission";
+import VideoCall from "./components/VideoCall";
+import IncomingCall from "./components/IncomingCall";
 
 import { Loader } from "lucide-react";
 import { Toaster } from "react-hot-toast";
@@ -29,15 +31,26 @@ const App = () => {
 
   if (isCheckingAuth && !authUser)
     return (
-      <div className="flex items-center justify-center h-screen">
-        <Loader className="size-10 animate-spin" />
+      <div className="flex items-center justify-center h-screen bg-gradient-to-br from-base-100 to-base-200">
+        <div className="text-center">
+          <Loader className="size-12 animate-spin text-primary mx-auto" />
+          <p className="mt-4 text-base-content/70 animate-pulse">Loading...</p>
+        </div>
       </div>
     );
 
   return (
-    <div data-theme={theme}>
+    <div data-theme={theme} className="min-h-screen bg-base-100 transition-colors duration-300">
       <Navbar />
       <NotificationPermission />
+
+      {/* Call Components - Only rendered when authenticated */}
+      {authUser && (
+        <>
+          <VideoCall />
+          <IncomingCall />
+        </>
+      )}
 
       <Routes>
         <Route path="/" element={authUser ? <HomePage /> : <Navigate to="/login" />} />
@@ -47,7 +60,16 @@ const App = () => {
         <Route path="/profile" element={authUser ? <ProfilePage /> : <Navigate to="/login" />} />
       </Routes>
 
-      <Toaster />
+      <Toaster 
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            borderRadius: '12px',
+            padding: '16px',
+          },
+        }}
+      />
     </div>
   );
 };
