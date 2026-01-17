@@ -4,6 +4,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
+import Badge from "./Badge";
 
 const ChatHeader = () => {
   const { selectedUser, setSelectedUser } = useChatStore();
@@ -57,9 +58,15 @@ const ChatHeader = () => {
 
           {/* User info */}
           <div>
-            <h3 className="font-semibold text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
-              {selectedUser.fullName}
-            </h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-semibold text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
+                {selectedUser.fullName}
+              </h3>
+              <Badge badgeType={selectedUser.badgeType} size="xs" />
+              {selectedUser.isPremium && (
+                <span className="text-xs">✨</span>
+              )}
+            </div>
             <div className="flex items-center gap-1">
               <span
                 className={`w-2 h-2 rounded-full ${

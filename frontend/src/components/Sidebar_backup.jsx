@@ -5,7 +5,6 @@ import SidebarSkeleton from "./skeletons/SidebarSkeleton";
 import { Users, Bell, BellOff, Search, X } from "lucide-react";
 import { notificationManager } from "../lib/notifications";
 import { motion, AnimatePresence } from "framer-motion";
-import Badge from "./Badge";
 
 const Sidebar = () => {
   const { getUsers, users, selectedUser, setSelectedUser, isUsersLoading } = useChatStore();
@@ -148,12 +147,8 @@ const Sidebar = () => {
 
               {/* User info */}
               <div className="flex-1 text-left min-w-0">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center justify-between">
                   <h3 className="font-semibold truncate">{user.fullName}</h3>
-                  <Badge badgeType={user.badgeType} size="xs" />
-                  {user.isPremium && (
-                    <span className="text-xs">✨</span>
-                  )}
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span
