@@ -7,6 +7,7 @@ import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
 import MessageActions from "./MessageActions";
 import ForwardModal from "./ForwardModal";
+import Badge from "./Badge";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
 import { Check, CheckCheck, SmilePlus, Forward, Play, Pause, Search, X } from "lucide-react";
@@ -117,13 +118,13 @@ const ChatContainer = () => {
   if (isMessagesLoading) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden bg-base-100">
-        <div className="flex-shrink-0">
+        <div className="sticky top-0 z-20 flex-shrink-0">
           <ChatHeader />
         </div>
         <div className="flex-1 overflow-y-auto">
           <MessageSkeleton />
         </div>
-        <div className="flex-shrink-0">
+        <div className="sticky bottom-0 z-10 flex-shrink-0">
           <MessageInput />
         </div>
       </div>
@@ -132,8 +133,8 @@ const ChatContainer = () => {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-base-100 to-base-200/30 h-full">
-      {/* Fixed header */}
-      <div className="flex-shrink-0">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-20 flex-shrink-0">
         <ChatHeader />
       </div>
 
@@ -227,8 +228,14 @@ const ChatContainer = () => {
               </div>
             </div>
             <div className="chat-header mb-1 flex items-center gap-2">
-              <span className="text-xs font-medium opacity-70">
+              <span className="text-xs font-medium opacity-70 flex items-center gap-1">
                 {message.senderId === authUser._id ? "You" : selectedUser.fullName.split(" ")[0]}
+                {message.senderId !== authUser._id && selectedUser.badgeType && selectedUser.badgeType !== "none" && (
+                  <Badge badgeType={selectedUser.badgeType} size="xs" />
+                )}
+                {message.senderId === authUser._id && authUser.badgeType && authUser.badgeType !== "none" && (
+                  <Badge badgeType={authUser.badgeType} size="xs" />
+                )}
               </span>
               <time className="text-xs opacity-50">
                 {formatMessageTime(message.createdAt)}
@@ -425,8 +432,8 @@ const ChatContainer = () => {
         </AnimatePresence>
       </div>
 
-      {/* Fixed input at bottom */}
-      <div className="flex-shrink-0">
+      {/* Sticky input at bottom */}
+      <div className="sticky bottom-0 z-10 flex-shrink-0">
         <MessageInput />
       </div>
 

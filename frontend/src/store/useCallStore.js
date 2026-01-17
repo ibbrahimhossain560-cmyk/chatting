@@ -158,24 +158,64 @@ const checkMediaPermissions = async (audio = true, video = false) => {
   }
 };
 
-// Get media stream with better error handling
+// Get media stream with better error handling and permission prompts
 const getMediaStream = async (constraints) => {
   try {
+    // First, ensure we have permission by requesting with basic constraints
+    // This helps trigger the browser permission prompt properly
+    if (constraints.video) {
+      try {
+        // Try to get video permission first with minimal constraints
+        const testStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        testStream.getTracks().forEach(track => track.stop());
+      } catch (videoErr) {
+        console.log("Video permission check failed:", videoErr.name);
+        // If video fails, we'll handle it below
+      }
+    }
+    
+    if (constraints.audio) {
+      try {
+        // Try to get audio permission with minimal constraints
+        const testStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        testStream.getTracks().forEach(track => track.stop());
+      } catch (audioErr) {
+        console.log("Audio permission check failed:", audioErr.name);
+      }
+    }
+    
+    // Now try to get the actual stream with full constraints
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     return { stream, error: null };
   } catch (error) {
+    console.error("Media access error:", error.name, error.message);
     let errorMessage = "Could not access media devices";
     
     if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-      errorMessage = "Permission denied. Please allow access in your browser settings.";
+      // Check if it's a user dismissal vs actual denial
+      errorMessage = "Camera/microphone access denied. Please click the camera icon in your browser's address bar to allow access, then try again.";
     } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-      errorMessage = "No camera/microphone found on this device.";
+      errorMessage = "No camera/microphone found. Please connect a device and try again.";
     } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
-      errorMessage = "Camera/microphone is already in use by another app.";
+      errorMessage = "Camera/microphone is being used by another app. Please close other apps and try again.";
     } else if (error.name === "OverconstrainedError") {
-      errorMessage = "Camera doesn't support requested settings.";
+      // Try again with less strict constraints
+      try {
+        const fallbackConstraints = {
+          audio: constraints.audio ? { echoCancellation: true } : false,
+          video: constraints.video ? { facingMode: "user" } : false,
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        return { stream, error: null };
+      } catch (e) {
+        errorMessage = "Camera doesn't support the requested settings.";
+      }
     } else if (error.name === "TypeError") {
-      errorMessage = "No media devices available.";
+      errorMessage = "No media devices available on this device.";
+    } else if (error.name === "AbortError") {
+      errorMessage = "Something went wrong. Please try again.";
+    } else if (error.name === "SecurityError") {
+      errorMessage = "Media access blocked due to security settings. Please use HTTPS.";
     }
     
     return { stream: null, error: errorMessage };

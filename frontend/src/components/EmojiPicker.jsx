@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import { Search, X, Clock } from "lucide-react";
 
 // Comprehensive emoji categories
@@ -115,26 +115,53 @@ const EmojiPicker = ({ onSelect, onClose }) => {
     }
   }, []);
 
-  // Close on click outside
+  // Close on click outside with proper event handling
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Don't close if clicking on the emoji button itself
+      if (event.target.closest('[data-emoji-trigger]')) {
+        return;
+      }
       if (pickerRef.current && !pickerRef.current.contains(event.target)) {
         onClose();
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    // Use timeout to prevent immediate close on same click
+    const timeoutId = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
   }, [onClose]);
 
-  const handleEmojiSelect = (emoji) => {
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [onClose]);
+
+  const handleEmojiSelect = useCallback((emoji) => {
     // Update recent emojis
-    const newRecent = [emoji, ...recentEmojis.filter((e) => e !== emoji)].slice(0, 30);
-    setRecentEmojis(newRecent);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newRecent));
+    setRecentEmojis((prev) => {
+      const newRecent = [emoji, ...prev.filter((e) => e !== emoji)].slice(0, 30);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newRecent));
+      return newRecent;
+    });
     
     onSelect(emoji);
-  };
+    onClose();
+  }, [onSelect, onClose]);
 
   const getFilteredEmojis = () => {
     if (searchQuery) {
@@ -159,7 +186,9 @@ const EmojiPicker = ({ onSelect, onClose }) => {
       initial={{ opacity: 0, scale: 0.9, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9, y: 10 }}
-      className="absolute bottom-full mb-2 left-0 w-72 sm:w-80 bg-base-100 rounded-xl shadow-xl border border-base-300 overflow-hidden z-50"
+      transition={{ duration: 0.15 }}
+      className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 bg-base-100 rounded-xl shadow-2xl border border-base-300 overflow-hidden z-50"
+      onClick={(e) => e.stopPropagation()}
     >
       {/* Search bar */}
       <div className="p-2 border-b border-base-200">
@@ -211,7 +240,7 @@ const EmojiPicker = ({ onSelect, onClose }) => {
               <button
                 key={`${emoji}-${index}`}
                 onClick={() => handleEmojiSelect(emoji)}
-                className="p-1.5 text-xl hover:bg-base-200 rounded-lg transition-colors hover:scale-110"
+                className="p-1.5 text-xl hover:bg-base-200 rounded-lg transition-all duration-150 hover:scale-110 active:scale-95"
               >
                 {emoji}
               </button>
@@ -233,7 +262,7 @@ const EmojiPicker = ({ onSelect, onClose }) => {
             <button
               key={emoji}
               onClick={() => handleEmojiSelect(emoji)}
-              className="p-1 text-xl hover:scale-125 transition-transform"
+              className="p-1 text-xl hover:scale-125 active:scale-95 transition-transform"
             >
               {emoji}
             </button>

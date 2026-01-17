@@ -256,6 +256,7 @@ const MessageInput = () => {
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
               type="button"
+              data-emoji-trigger="true"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
               className={`absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-circle btn-xs ${
                 showEmojiPicker ? "text-primary" : "text-base-content/50 hover:text-primary"
