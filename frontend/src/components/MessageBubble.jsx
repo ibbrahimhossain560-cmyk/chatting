@@ -249,7 +249,7 @@ const MessageBubble = ({
         )}
       </motion.div>
 
-      {/* Long press popup menu - centered and compact */}
+      {/* Long press popup menu - perfectly centered on screen */}
       <AnimatePresence>
         {showPopup && (
           <>
@@ -257,22 +257,16 @@ const MessageBubble = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm"
               onClick={() => { setShowPopup(false); setShowDeleteOptions(false); }}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="fixed z-[70] bg-base-100 rounded-xl shadow-2xl border border-base-300 overflow-hidden"
-              style={{
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                width: 'min(260px, 85vw)',
-                maxHeight: '80vh',
-              }}
+              className="fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none"
             >
+              <div className="bg-base-100 rounded-xl shadow-2xl border border-base-300 overflow-hidden pointer-events-auto w-[260px] max-w-[85vw] max-h-[80vh]">
               {/* Message preview */}
               <div className="p-2.5 border-b border-base-200 bg-base-200/30">
                 <p className="text-xs truncate">{message.text || (message.image ? "📷 Photo" : "🎤 Voice")}</p>
@@ -343,14 +337,15 @@ const MessageBubble = ({
                 )}
               </div>
 
-              {/* Close button - compact */}
-              <div className="border-t border-base-200 p-1.5">
-                <button 
-                  onClick={() => { setShowPopup(false); setShowDeleteOptions(false); }} 
-                  className="w-full btn btn-xs btn-ghost text-xs"
-                >
-                  Cancel
-                </button>
+                {/* Close button - compact */}
+                <div className="border-t border-base-200 p-1.5">
+                  <button 
+                    onClick={() => { setShowPopup(false); setShowDeleteOptions(false); }} 
+                    className="w-full btn btn-xs btn-ghost text-xs"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </motion.div>
           </>
