@@ -212,6 +212,51 @@ export const toggleStarMessage = async (req, res) => {
   }
 };
 
+// Edit message
+export const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { text } = req.body;
+    const userId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    // Only sender can edit their message
+    if (message.senderId.toString() !== userId.toString()) {
+      return res.status(403).json({ error: "Only sender can edit their message" });
+    }
+
+    // Can only edit text messages
+    if (!message.text) {
+      return res.status(400).json({ error: "Can only edit text messages" });
+    }
+
+    message.text = text;
+    message.isEdited = true;
+    message.editedAt = new Date();
+    await message.save();
+
+    // Notify receiver about the edit
+    const receiverSocketId = getReceiverSocketId(message.receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("messageEdited", { 
+        messageId, 
+        text: message.text, 
+        isEdited: true,
+        editedAt: message.editedAt 
+      });
+    }
+
+    res.status(200).json({ success: true, message });
+  } catch (error) {
+    console.log("Error in editMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // Forward message
 export const forwardMessage = async (req, res) => {
   try {

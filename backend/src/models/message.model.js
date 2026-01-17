@@ -66,6 +66,14 @@ const messageSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Edited message
+    isEdited: {
+      type: Boolean,
+      default: false,
+    },
+    editedAt: {
+      type: Date,
+    },
     // Starred/pinned
     starred: [{
       type: mongoose.Schema.Types.ObjectId,

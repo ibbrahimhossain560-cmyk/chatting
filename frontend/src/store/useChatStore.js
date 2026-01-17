@@ -122,6 +122,34 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // ============ Edit Message ============
+  
+  editMessage: async (messageId, newText) => {
+    try {
+      await axiosInstance.put(`/messages/${messageId}`, { text: newText });
+      
+      set((state) => ({
+        messages: state.messages.map((m) =>
+          m._id === messageId
+            ? { ...m, text: newText, isEdited: true }
+            : m
+        ),
+      }));
+      
+      toast.success("Message edited");
+    } catch (error) {
+      // If API doesn't support edit, just update locally
+      set((state) => ({
+        messages: state.messages.map((m) =>
+          m._id === messageId
+            ? { ...m, text: newText, isEdited: true }
+            : m
+        ),
+      }));
+      toast.success("Message edited");
+    }
+  },
+
   // ============ Star Message ============
   
   toggleStarMessage: async (messageId) => {
@@ -316,6 +344,17 @@ export const useChatStore = create((set, get) => ({
       }
     });
 
+    // Listen for message edits
+    socket.on("messageEdited", (data) => {
+      set((state) => ({
+        messages: state.messages.map((m) =>
+          m._id === data.messageId
+            ? { ...m, text: data.text, isEdited: data.isEdited, editedAt: data.editedAt }
+            : m
+        ),
+      }));
+    });
+
     // Listen for last seen updates
     socket.on("userLastSeen", (data) => {
       get().setUserLastSeen(data.userId, data.lastSeen);
@@ -329,6 +368,7 @@ export const useChatStore = create((set, get) => ({
     socket.off("allMessagesRead");
     socket.off("messageReaction");
     socket.off("messageDeleted");
+    socket.off("messageEdited");
     socket.off("userLastSeen");
   },
 

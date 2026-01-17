@@ -5,6 +5,7 @@ import {
   getUsersForSidebar, 
   sendMessage,
   deleteMessage,
+  editMessage,
   addReaction,
   toggleStarMessage,
   forwardMessage 
@@ -16,6 +17,7 @@ router.get("/users", protectRoute, getUsersForSidebar);
 router.get("/:id", protectRoute, getMessages);
 
 router.post("/send/:id", protectRoute, sendMessage);
+router.put("/:messageId", protectRoute, editMessage);
 router.delete("/:messageId", protectRoute, deleteMessage);
 router.post("/:messageId/reaction", protectRoute, addReaction);
 router.post("/:messageId/star", protectRoute, toggleStarMessage);

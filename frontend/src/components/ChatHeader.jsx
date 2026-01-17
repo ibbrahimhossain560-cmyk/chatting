@@ -19,11 +19,11 @@ const ChatHeader = () => {
 
   const handleAudioCall = () => {
     if (!isOnline) {
-      toast.error("User is offline. Cannot make a call.");
+      toast.error("User is offline");
       return;
     }
     if (isInCall) {
-      toast.error("You are already in a call.");
+      toast.error("Already in a call");
       return;
     }
     initiateCall(selectedUser, "audio");
@@ -31,20 +31,18 @@ const ChatHeader = () => {
 
   const handleVideoCall = () => {
     if (!isOnline) {
-      toast.error("User is offline. Cannot make a call.");
+      toast.error("User is offline");
       return;
     }
     if (isInCall) {
-      toast.error("You are already in a call.");
+      toast.error("Already in a call");
       return;
     }
     initiateCall(selectedUser, "video");
   };
 
   const handleCloseChat = () => {
-    // Clear the selected user
     setSelectedUser(null);
-    // Refresh the page to ensure clean state
     window.location.href = '/';
   };
 
@@ -56,101 +54,94 @@ const ChatHeader = () => {
         onClose={() => setShowProfileModal(false)}
       />
 
-      <div className="sticky top-0 z-20 p-2.5 sm:p-4 border-b border-base-300 bg-base-100 shadow-sm">
+      {/* Fixed header with high z-index */}
+      <div className="p-2.5 sm:p-3 border-b border-base-300 bg-base-100 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Avatar with online indicator - clickable */}
+            {/* Avatar - clickable for profile */}
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="avatar cursor-pointer"
+              className="avatar cursor-pointer flex-shrink-0"
               onClick={() => setShowProfileModal(true)}
-              title="View profile"
             >
-              <div className="size-10 sm:size-12 rounded-full relative ring-2 ring-offset-2 ring-offset-base-100 ring-primary/20 hover:ring-primary/40 transition-all">
+              <div className="size-9 sm:size-11 rounded-full relative ring-2 ring-primary/20">
                 <img
                   src={selectedUser.profilePic || "/avatar.png"}
                   alt={selectedUser.fullName}
                   className="rounded-full object-cover"
                 />
                 {isOnline && (
-                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full ring-2 ring-base-100" />
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full ring-2 ring-base-100" />
                 )}
               </div>
             </motion.div>
 
-            {/* User info */}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h3 className="font-semibold text-sm sm:text-base truncate max-w-[100px] sm:max-w-[180px] text-base-content">
+            {/* User info - name and badge close together */}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1">
+                <h3 className="font-semibold text-sm sm:text-base truncate max-w-[120px] sm:max-w-[180px] text-base-content">
                   {selectedUser.fullName}
                 </h3>
                 {selectedUser.badgeType && selectedUser.badgeType !== "none" && (
-                  <Badge badgeType={selectedUser.badgeType} size="sm" />
+                  <Badge badgeType={selectedUser.badgeType} size="xs" />
                 )}
                 {selectedUser.isPremium && (
-                  <span className="text-sm">✨</span>
+                  <span className="text-xs">✨</span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5">
-                <span
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    isOnline ? "bg-green-500" : "bg-gray-400"
-                  }`}
-                />
-                <p className="text-xs sm:text-sm text-base-content/70">
+              <div className="flex items-center gap-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-400"}`} />
+                <p className="text-xs text-base-content/60">
                   {isOnline ? "Online" : "Offline"}
                 </p>
                 {selectedUser.username && (
-                  <span className="text-xs text-base-content/50">@{selectedUser.username}</span>
+                  <span className="text-xs text-base-content/40 ml-1">@{selectedUser.username}</span>
                 )}
               </div>
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-            {/* Audio call button */}
+          <div className="flex items-center gap-0.5 sm:gap-1">
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleAudioCall}
               disabled={!isOnline || isInCall}
-              className={`btn btn-circle btn-sm sm:btn-md ${
+              className={`btn btn-circle btn-sm ${
                 isOnline && !isInCall
-                  ? "btn-ghost text-base-content hover:bg-primary/20 hover:text-primary"
-                  : "btn-disabled opacity-50"
+                  ? "btn-ghost text-base-content hover:text-primary hover:bg-primary/10"
+                  : "btn-disabled opacity-40"
               }`}
               title="Audio Call"
             >
-              <Phone className="size-4 sm:size-5" />
+              <Phone className="size-4" />
             </motion.button>
 
-            {/* Video call button */}
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleVideoCall}
               disabled={!isOnline || isInCall}
-              className={`btn btn-circle btn-sm sm:btn-md ${
+              className={`btn btn-circle btn-sm ${
                 isOnline && !isInCall
-                  ? "btn-ghost text-base-content hover:bg-primary/20 hover:text-primary"
-                  : "btn-disabled opacity-50"
+                  ? "btn-ghost text-base-content hover:text-primary hover:bg-primary/10"
+                  : "btn-disabled opacity-40"
               }`}
               title="Video Call"
             >
-              <Video className="size-4 sm:size-5" />
+              <Video className="size-4" />
             </motion.button>
 
-            {/* Close button */}
             <motion.button
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleCloseChat}
-              className="btn btn-circle btn-sm sm:btn-md btn-ghost text-base-content hover:bg-error/20 hover:text-error"
-              title="Close chat"
+              className="btn btn-circle btn-sm btn-ghost text-base-content hover:text-error hover:bg-error/10"
+              title="Close"
             >
-              <X className="size-4 sm:size-5" />
+              <X className="size-4" />
             </motion.button>
           </div>
         </div>
