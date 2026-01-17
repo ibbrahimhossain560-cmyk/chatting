@@ -9,6 +9,8 @@ let ringtoneOscillator = null;
 
 const playRingtone = () => {
   try {
+    if (ringtoneOscillator) return; // Already playing
+    
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
@@ -59,13 +61,14 @@ const stopRingtone = () => {
   }
 };
 
-// ICE servers for better connectivity
+// ICE servers for better connectivity - using reliable public servers
 const getIceServers = () => [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
   { urls: 'stun:stun3.l.google.com:19302' },
   { urls: 'stun:stun4.l.google.com:19302' },
+  // Free TURN servers for NAT traversal
   {
     urls: 'turn:openrelay.metered.ca:80',
     username: 'openrelayproject',
@@ -83,29 +86,64 @@ const getIceServers = () => [
   },
 ];
 
-// Get media stream
+// Get media stream with permission request
 const getMediaStream = async (wantVideo = false) => {
   console.log("getMediaStream called, wantVideo:", wantVideo);
   
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    return { stream: null, error: "Browser doesn't support media devices" };
+    return { stream: null, error: "Browser doesn't support media devices", permissionDenied: false };
   }
 
   try {
-    const constraints = { audio: true, video: wantVideo };
+    const constraints = { 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      }, 
+      video: wantVideo ? {
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 },
+        facingMode: 'user',
+      } : false 
+    };
     console.log("Requesting media with:", constraints);
     const stream = await navigator.mediaDevices.getUserMedia(constraints);
     console.log("Got stream with tracks:", stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled })));
-    return { stream, error: null };
+    return { stream, error: null, permissionDenied: false };
   } catch (err) {
     console.error("getUserMedia error:", err.name, err.message);
     
-    // If video failed, try audio only
+    const isPermissionDenied = err.name === "NotAllowedError" || err.name === "PermissionDeniedError";
+    
+    // If video failed due to permission, try audio only
+    if (wantVideo && isPermissionDenied) {
+      console.log("Video permission denied, trying audio only...");
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: { echoCancellation: true, noiseSuppression: true },
+          video: false 
+        });
+        return { stream: audioStream, error: null, audioOnly: true, videoPermissionDenied: true, permissionDenied: false };
+      } catch (audioErr) {
+        console.error("Audio only also failed:", audioErr.name);
+        return { 
+          stream: null, 
+          error: "Microphone access denied. Please allow microphone access in your browser settings.", 
+          permissionDenied: true 
+        };
+      }
+    }
+    
+    // If video failed for other reasons, try audio only
     if (wantVideo) {
       console.log("Video failed, trying audio only...");
       try {
-        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        return { stream: audioStream, error: null, audioOnly: true };
+        const audioStream = await navigator.mediaDevices.getUserMedia({ 
+          audio: { echoCancellation: true, noiseSuppression: true },
+          video: false 
+        });
+        return { stream: audioStream, error: null, audioOnly: true, permissionDenied: false };
       } catch (audioErr) {
         console.error("Audio only also failed:", audioErr.name);
       }
@@ -113,15 +151,18 @@ const getMediaStream = async (wantVideo = false) => {
     
     let errorMessage = "Could not access media devices";
     
-    if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-      errorMessage = "Please allow camera/microphone access";
+    if (isPermissionDenied) {
+      errorMessage = wantVideo 
+        ? "Camera/Microphone access denied. Please allow access in your browser settings."
+        : "Microphone access denied. Please allow access in your browser settings.";
+      return { stream: null, error: errorMessage, permissionDenied: true };
     } else if (err.name === "NotFoundError") {
       errorMessage = "No camera/microphone found";
     } else if (err.name === "NotReadableError") {
       errorMessage = "Camera/microphone is being used by another app";
     }
     
-    return { stream: null, error: errorMessage };
+    return { stream: null, error: errorMessage, permissionDenied: false };
   }
 };
 
@@ -133,12 +174,12 @@ export const formatCallDuration = (seconds) => {
   const secs = seconds % 60;
   
   if (hours > 0) {
-    return `${hours} hour${hours > 1 ? 's' : ''} ${minutes} min${minutes !== 1 ? 's' : ''} ${secs} sec${secs !== 1 ? 's' : ''}`;
+    return `${hours}h ${minutes}m ${secs}s`;
   }
   if (minutes > 0) {
-    return `${minutes} min${minutes !== 1 ? 's' : ''} ${secs} sec${secs !== 1 ? 's' : ''}`;
+    return `${minutes}m ${secs}s`;
   }
-  return `${secs} sec${secs !== 1 ? 's' : ''}`;
+  return `${secs}s`;
 };
 
 // Dynamically import simple-peer to avoid SSR issues
@@ -159,15 +200,23 @@ const loadSimplePeer = async () => {
 export const useCallStore = create(
   persist(
     (set, get) => ({
-      callStatus: "idle",
-      callType: null,
+      // Call state
+      callStatus: "idle", // idle, calling, receiving, connecting, ongoing, reconnecting
+      callType: null, // 'audio' or 'video'
       caller: null,
       receiver: null,
+      
+      // Streams
       localStream: null,
       remoteStream: null,
+      
+      // Peer connection
       peer: null,
-      peerConnection: null,
+      
+      // Call timing
       callStartTime: null,
+      
+      // UI state
       isMuted: false,
       isVideoOff: false,
       isSpeakerOn: true,
@@ -175,31 +224,60 @@ export const useCallStore = create(
       usingFrontCamera: true,
       lowDataMode: false,
       networkQuality: "good",
-      connectionStats: null,
+      
+      // Signaling
       incomingSignal: null,
+      pendingCandidates: [], // Store ICE candidates that arrive before peer is ready
+      
+      // Reconnection
       reconnectAttempts: 0,
-      maxReconnectAttempts: 5,
+      maxReconnectAttempts: 3,
+      
+      // Permission state
+      permissionDenied: false,
+      permissionType: null,
+      
+      // Internal
       _monitorInterval: null,
+      _callTimeout: null,
+      
+      // Persistent data
       lastCallInfo: null,
       callHistory: [],
 
+      // ============ Helper Methods ============
+      
       setLowDataMode: (enabled) => set({ lowDataMode: enabled }),
       
-      // Add call to history
       addCallToHistory: (callInfo) => {
         const { callHistory } = get();
         const newHistory = [
           { ...callInfo, id: Date.now() },
           ...callHistory
-        ].slice(0, 50); // Keep last 50 calls
+        ].slice(0, 50);
         set({ callHistory: newHistory });
       },
       
       clearCallHistory: () => set({ callHistory: [] }),
+      clearLastCallInfo: () => set({ lastCallInfo: null }),
+      clearPermissionDenied: () => set({ permissionDenied: false, permissionType: null }),
 
-      // Handle incoming call from socket
+      // ============ Socket Event Handlers ============
+
       handleIncomingCall: (data) => {
-        console.log("Incoming call received:", data);
+        const { callStatus } = get();
+        
+        // Reject if already in a call
+        if (callStatus !== "idle") {
+          console.log("Already in call, rejecting incoming call");
+          const socket = useAuthStore.getState().socket;
+          if (socket) {
+            socket.emit("rejectCall", { to: data.from });
+          }
+          return;
+        }
+        
+        console.log("📞 Incoming call received:", data);
         playRingtone();
         
         set({
@@ -211,33 +289,117 @@ export const useCallStore = create(
           },
           incomingSignal: data.signal,
           callType: data.callType,
+          pendingCandidates: [],
         });
         
-        // Auto-reject after 60 seconds
-        setTimeout(() => {
+        // Auto-reject after 45 seconds
+        const timeout = setTimeout(() => {
           if (get().callStatus === "receiving") {
+            console.log("Call timeout - auto rejecting");
             get().rejectCall();
             toast("Missed call from " + data.callerName, { icon: "📞" });
           }
-        }, 60000);
+        }, 45000);
+        
+        set({ _callTimeout: timeout });
       },
+
+      handleCallAccepted: (signal) => {
+        console.log("✅ Call accepted by receiver, signaling peer");
+        const { peer, callStatus, _callTimeout } = get();
+        
+        // Clear timeout
+        if (_callTimeout) {
+          clearTimeout(_callTimeout);
+          set({ _callTimeout: null });
+        }
+        
+        stopRingtone();
+        
+        if (!peer) {
+          console.error("❌ No peer available to signal");
+          toast.error("Call connection failed - no peer");
+          get().cleanupCall();
+          return;
+        }
+        
+        if (callStatus !== "calling") {
+          console.log("Call status changed, ignoring signal");
+          return;
+        }
+        
+        try {
+          // Update status immediately to show user the call was answered
+          set({ callStatus: "connecting" });
+          console.log("📡 Signaling peer with answer...");
+          
+          // Signal the peer with the answer
+          peer.signal(signal);
+          
+        } catch (e) {
+          console.error("❌ Error signaling peer:", e);
+          toast.error("Failed to connect call");
+          get().cleanupCall();
+        }
+      },
+
+      handleCallRejected: () => {
+        console.log("❌ Call was rejected by receiver");
+        const { _callTimeout } = get();
+        
+        if (_callTimeout) {
+          clearTimeout(_callTimeout);
+        }
+        
+        stopRingtone();
+        toast("Call was declined", { icon: "📞" });
+        get().cleanupCall();
+      },
+
+      handleCallEnded: () => {
+        console.log("📞 Call ended by other party");
+        const { _callTimeout } = get();
+        
+        if (_callTimeout) {
+          clearTimeout(_callTimeout);
+        }
+        
+        stopRingtone();
+        toast("Call ended", { icon: "📞" });
+        get().cleanupCall();
+      },
+
+      // ============ Call Actions ============
 
       initiateCall: async (receiverUser, type) => {
         const socket = useAuthStore.getState().socket;
         const authUser = useAuthStore.getState().authUser;
         
-        if (!socket || !authUser) {
-          toast.error("Not connected. Please refresh and try again.");
+        if (!socket?.connected) {
+          toast.error("Not connected to server. Please refresh.");
+          return;
+        }
+        
+        if (!authUser) {
+          toast.error("Please log in to make calls.");
+          return;
+        }
+
+        const { callStatus } = get();
+        if (callStatus !== "idle") {
+          toast.error("Already in a call");
           return;
         }
 
         const isVideoCall = type === 'video';
         let actualCallType = type;
         
+        console.log(`📞 Initiating ${type} call to:`, receiverUser.fullName);
+        
         const loadingToast = toast.loading("Setting up call...");
         
         try {
-          // Load simple-peer dynamically
+          // Load simple-peer
           const Peer = await loadSimplePeer();
           if (!Peer) {
             toast.dismiss(loadingToast);
@@ -245,23 +407,33 @@ export const useCallStore = create(
             return;
           }
 
+          // Get media stream
           const result = await getMediaStream(isVideoCall);
-          
           toast.dismiss(loadingToast);
           
           if (!result.stream) {
-            toast.error(result.error || "Could not access microphone");
+            if (result.permissionDenied) {
+              set({ permissionDenied: true, permissionType: isVideoCall ? "camera" : "microphone" });
+              toast.error(result.error || "Permission denied");
+            } else {
+              toast.error(result.error || "Could not access microphone");
+            }
             return;
           }
           
-          if (result.audioOnly && isVideoCall) {
+          // Handle video fallback
+          if (result.videoPermissionDenied && isVideoCall) {
+            toast("Camera access denied. Using audio only.", { icon: "🎤" });
+            actualCallType = 'audio';
+          } else if (result.audioOnly && isVideoCall) {
             toast("Camera unavailable, using audio only", { icon: "🎤" });
             actualCallType = 'audio';
           }
           
           const stream = result.stream;
-          console.log("Call starting with stream tracks:", stream.getTracks().map(t => t.kind));
+          console.log("📹 Got local stream:", stream.getTracks().map(t => t.kind));
           
+          // Update state before creating peer
           set({
             callStatus: "calling",
             callType: actualCallType,
@@ -269,18 +441,25 @@ export const useCallStore = create(
             localStream: stream,
             reconnectAttempts: 0,
             isVideoOff: actualCallType === 'audio',
+            permissionDenied: false,
+            permissionType: null,
           });
 
-          // Create peer connection
+          // Create initiator peer
+          console.log("🔗 Creating peer connection (initiator)...");
           const peer = new Peer({
             initiator: true,
-            trickle: true,
+            trickle: false, // Wait for all ICE candidates before signaling
             stream: stream,
-            config: { iceServers: getIceServers() },
+            config: { 
+              iceServers: getIceServers(),
+              iceTransportPolicy: 'all',
+            },
           });
 
+          // Signal event - send offer to receiver
           peer.on("signal", (signalData) => {
-            console.log("Sending signal to receiver");
+            console.log("📤 Sending call signal to:", receiverUser._id);
             socket.emit("callUser", {
               userToCall: receiverUser._id,
               signalData,
@@ -291,63 +470,85 @@ export const useCallStore = create(
             });
           });
 
+          // Remote stream received
           peer.on("stream", (remoteStream) => {
-            console.log("Received remote stream");
+            console.log("📥 Received remote stream:", remoteStream.getTracks().map(t => t.kind));
             set({ remoteStream, networkQuality: "good" });
           });
 
+          // Peer connected - call is now active
           peer.on("connect", () => {
-            console.log("Peer connected!");
-            // Only update if not already ongoing (to avoid resetting timer)
-            const currentStatus = get().callStatus;
-            if (currentStatus !== "ongoing") {
-              set({ callStatus: "ongoing", callStartTime: Date.now(), networkQuality: "good" });
-            } else {
-              set({ networkQuality: "good" });
-            }
+            console.log("🎉 Peer connected! Call is now ongoing.");
+            set({ 
+              callStatus: "ongoing", 
+              callStartTime: Date.now(), 
+              networkQuality: "good" 
+            });
             get().startConnectionMonitor();
           });
 
+          // Peer closed
           peer.on("close", () => {
-            console.log("Peer closed");
-            get().endCall();
+            console.log("🔌 Peer connection closed");
+            if (get().callStatus !== "idle") {
+              get().endCall();
+            }
           });
 
+          // Peer error
           peer.on("error", (err) => {
-            console.error("Peer error:", err);
-            if (get().callStatus === "ongoing") {
+            console.error("❌ Peer error:", err.message);
+            const status = get().callStatus;
+            
+            if (status === "ongoing" || status === "connecting") {
+              // Try to reconnect for established calls
               get().attemptReconnect();
             } else {
-              toast.error("Call connection failed");
-              get().endCall();
+              toast.error("Connection failed: " + err.message);
+              get().cleanupCall();
             }
           });
 
           set({ peer });
           
-          // Timeout for unanswered calls
-          setTimeout(() => {
+          // Set timeout for unanswered call
+          const callTimeout = setTimeout(() => {
             if (get().callStatus === "calling") {
+              console.log("⏰ Call timeout - not answered");
               toast.error("Call not answered");
               get().endCall();
             }
           }, 45000);
           
+          set({ _callTimeout: callTimeout });
+          
         } catch (error) {
           toast.dismiss(loadingToast);
-          console.error("Call initiation error:", error);
-          toast.error("Failed to start call. Please try again.");
+          console.error("❌ Call initiation error:", error);
+          toast.error("Failed to start call");
           get().cleanupCall();
         }
       },
 
       acceptCall: async () => {
         const socket = useAuthStore.getState().socket;
-        const { incomingSignal, caller, callType } = get();
+        const { incomingSignal, caller, callType, _callTimeout } = get();
         
-        if (!socket || !incomingSignal || !caller) {
-          toast.error("Call data missing. Please try again.");
+        if (!socket?.connected) {
+          toast.error("Not connected to server");
           return;
+        }
+        
+        if (!incomingSignal || !caller) {
+          toast.error("Call data missing");
+          get().cleanupCall();
+          return;
+        }
+
+        // Clear auto-reject timeout
+        if (_callTimeout) {
+          clearTimeout(_callTimeout);
+          set({ _callTimeout: null });
         }
 
         stopRingtone();
@@ -355,87 +556,129 @@ export const useCallStore = create(
         const isVideoCall = callType === 'video';
         let actualCallType = callType;
         
+        console.log(`📞 Accepting ${callType} call from:`, caller.fullName);
+        
         const loadingToast = toast.loading("Connecting...");
         
         try {
-          // Load simple-peer dynamically
+          // Load simple-peer
           const Peer = await loadSimplePeer();
           if (!Peer) {
             toast.dismiss(loadingToast);
-            toast.error("Call module not available. Please refresh.");
+            toast.error("Call module not available");
             get().rejectCall();
             return;
           }
 
+          // Get media stream
           const result = await getMediaStream(isVideoCall);
-          
           toast.dismiss(loadingToast);
           
           if (!result.stream) {
+            if (result.permissionDenied) {
+              set({ 
+                permissionDenied: true, 
+                permissionType: isVideoCall ? "camera" : "microphone",
+                callStatus: "receiving", // Stay in receiving to show permission UI
+              });
+              toast.error("Please allow microphone access and try again");
+              return;
+            }
             toast.error(result.error || "Could not access microphone");
             get().rejectCall();
             return;
           }
           
-          if (result.audioOnly && isVideoCall) {
+          // Handle video fallback
+          if (result.videoPermissionDenied && isVideoCall) {
+            toast("Camera access denied. Using audio only.", { icon: "🎤" });
+            actualCallType = 'audio';
+          } else if (result.audioOnly && isVideoCall) {
             toast("Camera unavailable, using audio only", { icon: "🎤" });
             actualCallType = 'audio';
           }
           
           const stream = result.stream;
+          console.log("📹 Got local stream:", stream.getTracks().map(t => t.kind));
           
+          // Update state
           set({
-            callStatus: "ongoing",
+            callStatus: "connecting",
             callType: actualCallType,
             localStream: stream,
-            callStartTime: Date.now(),
             isVideoOff: actualCallType === 'audio',
+            permissionDenied: false,
+            permissionType: null,
           });
 
+          // Create answering peer
+          console.log("🔗 Creating peer connection (answerer)...");
           const peer = new Peer({
             initiator: false,
-            trickle: true,
+            trickle: false,
             stream: stream,
-            config: { iceServers: getIceServers() },
+            config: { 
+              iceServers: getIceServers(),
+              iceTransportPolicy: 'all',
+            },
           });
 
+          // Signal event - send answer to caller
           peer.on("signal", (signalData) => {
-            console.log("Sending answer signal");
+            console.log("📤 Sending answer signal to:", caller._id);
             socket.emit("answerCall", {
               signal: signalData,
               to: caller._id,
             });
           });
 
+          // Remote stream received
           peer.on("stream", (remoteStream) => {
-            console.log("Answer: Received remote stream");
+            console.log("📥 Received remote stream:", remoteStream.getTracks().map(t => t.kind));
             set({ remoteStream });
           });
 
+          // Peer connected
           peer.on("connect", () => {
-            console.log("Answer: Peer connected!");
+            console.log("🎉 Peer connected! Call is now ongoing.");
+            set({ 
+              callStatus: "ongoing", 
+              callStartTime: Date.now(),
+              networkQuality: "good" 
+            });
             get().startConnectionMonitor();
           });
 
-          peer.on("close", () => get().endCall());
-          
-          peer.on("error", (err) => {
-            console.error("Answer peer error:", err);
-            if (get().callStatus === "ongoing") {
-              get().attemptReconnect();
-            } else {
-              toast.error("Connection failed");
+          // Peer closed
+          peer.on("close", () => {
+            console.log("🔌 Peer connection closed");
+            if (get().callStatus !== "idle") {
               get().endCall();
             }
           });
 
-          // Signal with incoming data
+          // Peer error
+          peer.on("error", (err) => {
+            console.error("❌ Peer error:", err.message);
+            const status = get().callStatus;
+            
+            if (status === "ongoing" || status === "connecting") {
+              get().attemptReconnect();
+            } else {
+              toast.error("Connection failed");
+              get().cleanupCall();
+            }
+          });
+
+          // Signal with incoming offer
+          console.log("📡 Signaling peer with incoming offer...");
           peer.signal(incomingSignal);
+          
           set({ peer });
           
         } catch (error) {
           toast.dismiss(loadingToast);
-          console.error("Accept call error:", error);
+          console.error("❌ Accept call error:", error);
           toast.error("Failed to answer call");
           get().rejectCall();
         }
@@ -443,29 +686,40 @@ export const useCallStore = create(
 
       rejectCall: () => {
         const socket = useAuthStore.getState().socket;
-        const { caller } = get();
+        const { caller, _callTimeout } = get();
+        
+        console.log("❌ Rejecting call");
+        
+        if (_callTimeout) {
+          clearTimeout(_callTimeout);
+        }
         
         stopRingtone();
         
-        if (socket && caller) {
+        if (socket?.connected && caller) {
           socket.emit("rejectCall", { to: caller._id });
         }
         
-        set({
-          callStatus: "idle",
-          caller: null,
-          incomingSignal: null,
-          callType: null,
-        });
+        get().cleanupCall();
       },
 
       endCall: () => {
         const socket = useAuthStore.getState().socket;
-        const { peer, localStream, receiver, caller, _monitorInterval, callStartTime, callType } = get();
+        const { peer, localStream, receiver, caller, _monitorInterval, _callTimeout, callStartTime, callType } = get();
+        
+        console.log("📞 Ending call");
         
         stopRingtone();
         
-        // Calculate and save call duration
+        // Clear timers
+        if (_callTimeout) {
+          clearTimeout(_callTimeout);
+        }
+        if (_monitorInterval) {
+          clearInterval(_monitorInterval);
+        }
+        
+        // Calculate call duration
         let callDuration = 0;
         if (callStartTime) {
           callDuration = Math.floor((Date.now() - callStartTime) / 1000);
@@ -473,7 +727,7 @@ export const useCallStore = create(
         
         const otherUser = receiver || caller;
         
-        // Save last call info for chat display and add to history
+        // Save call to history
         if (otherUser) {
           const callInfo = {
             duration: callDuration,
@@ -482,20 +736,16 @@ export const useCallStore = create(
             withUserId: otherUser._id,
             withUserName: otherUser.fullName,
             withUserPic: otherUser.profilePic,
-            wasCaller: !!receiver, // true if we initiated the call
+            wasCaller: !!receiver,
           };
           set({ lastCallInfo: callInfo });
           
-          // Add to persistent call history
           if (callDuration > 0) {
             get().addCallToHistory(callInfo);
           }
         }
         
-        if (_monitorInterval) {
-          clearInterval(_monitorInterval);
-        }
-        
+        // Destroy peer
         if (peer) {
           try {
             peer.destroy();
@@ -504,6 +754,7 @@ export const useCallStore = create(
           }
         }
         
+        // Stop local tracks
         if (localStream) {
           localStream.getTracks().forEach(track => {
             try {
@@ -514,10 +765,12 @@ export const useCallStore = create(
           });
         }
         
-        if (socket && otherUser) {
+        // Notify other party
+        if (socket?.connected && otherUser) {
           socket.emit("endCall", { to: otherUser._id });
         }
         
+        // Reset state
         set({
           callStatus: "idle",
           callType: null,
@@ -532,59 +785,24 @@ export const useCallStore = create(
           isVideoOff: false,
           isOnHold: false,
           reconnectAttempts: 0,
+          permissionDenied: false,
+          permissionType: null,
+          pendingCandidates: [],
           _monitorInterval: null,
+          _callTimeout: null,
         });
       },
 
-      handleCallAccepted: (signal) => {
-        console.log("Call accepted, signaling peer");
-        const { peer, callStatus } = get();
-        
-        // Stop any ringtone/beep immediately
-        stopRingtone();
-        
-        if (peer) {
-          try {
-            // Signal peer first - this is critical for WebRTC connection
-            peer.signal(signal);
-            console.log("Peer signaled successfully");
-            
-            // Update status to ongoing with timer
-            if (callStatus === "calling") {
-              set({ 
-                callStatus: "ongoing", 
-                callStartTime: Date.now() 
-              });
-            }
-          } catch (e) {
-            console.error("Error signaling peer:", e);
-            toast.error("Failed to connect call");
-            get().cleanupCall();
-          }
-        } else {
-          console.error("No peer available to signal");
-          toast.error("Call connection failed");
-          get().cleanupCall();
-        }
-      },
-
-      handleCallEnded: () => {
-        get().endCall();
-        toast("Call ended", { icon: "📞" });
-      },
-
-      handleCallRejected: () => {
-        get().endCall();
-        toast("Call was declined", { icon: "📞" });
-      },
+      // ============ Call Controls ============
 
       toggleMute: () => {
         const { localStream, isMuted } = get();
         if (localStream) {
           localStream.getAudioTracks().forEach(track => {
-            track.enabled = isMuted;
+            track.enabled = isMuted; // Toggle: if muted, enable; if unmuted, disable
           });
           set({ isMuted: !isMuted });
+          console.log(isMuted ? "🔊 Unmuted" : "🔇 Muted");
         }
       },
 
@@ -599,6 +817,7 @@ export const useCallStore = create(
             track.enabled = isVideoOff;
           });
           set({ isVideoOff: !isVideoOff });
+          console.log(isVideoOff ? "📹 Video on" : "📹 Video off");
         }
       },
 
@@ -613,69 +832,56 @@ export const useCallStore = create(
             track.enabled = isOnHold;
           });
           set({ isOnHold: !isOnHold });
+          console.log(isOnHold ? "▶️ Resumed" : "⏸️ On hold");
         }
       },
 
       switchCamera: async () => {
         const { localStream, usingFrontCamera, peer, isVideoOff } = get();
         if (!localStream) {
-          toast.error("No video stream available");
+          toast.error("No video stream");
           return;
         }
 
         const currentVideoTrack = localStream.getVideoTracks()[0];
         if (!currentVideoTrack) {
-          toast.error("No video track to switch");
+          toast.error("No video track");
           return;
         }
 
         try {
-          // Stop the current video track
           currentVideoTrack.stop();
           
-          // Get new stream with opposite camera
           const newFacingMode = usingFrontCamera ? 'environment' : 'user';
           
           let newStream;
           try {
             newStream = await navigator.mediaDevices.getUserMedia({
-              video: { 
-                facingMode: { exact: newFacingMode },
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-              },
+              video: { facingMode: { exact: newFacingMode } },
               audio: false,
             });
-          } catch (exactError) {
-            console.log("Exact facingMode failed, trying ideal:", exactError);
+          } catch {
             newStream = await navigator.mediaDevices.getUserMedia({
-              video: { 
-                facingMode: { ideal: newFacingMode },
-              },
+              video: { facingMode: { ideal: newFacingMode } },
               audio: false,
             });
           }
 
           const newVideoTrack = newStream.getVideoTracks()[0];
-          
           if (!newVideoTrack) {
             toast.error("Could not get new camera");
             return;
           }
 
           // Replace track in peer connection
-          if (peer && peer._pc) {
+          if (peer?._pc) {
             const senders = peer._pc.getSenders();
-            const videoSender = senders.find(sender => 
-              sender.track && sender.track.kind === 'video'
-            );
-            
+            const videoSender = senders.find(s => s.track?.kind === 'video');
             if (videoSender) {
               await videoSender.replaceTrack(newVideoTrack);
             }
           }
 
-          // Update the local stream
           localStream.removeTrack(currentVideoTrack);
           localStream.addTrack(newVideoTrack);
           
@@ -683,28 +889,26 @@ export const useCallStore = create(
             newVideoTrack.enabled = false;
           }
 
-          set({ 
-            usingFrontCamera: !usingFrontCamera,
-            localStream: localStream,
-          });
-          
+          set({ usingFrontCamera: !usingFrontCamera });
           toast.success(`Switched to ${!usingFrontCamera ? 'front' : 'back'} camera`);
         } catch (error) {
-          console.error("Failed to switch camera:", error);
+          console.error("Camera switch error:", error);
           toast.error("Could not switch camera");
         }
       },
 
+      // ============ Connection Monitoring ============
+
       startConnectionMonitor: () => {
         const interval = setInterval(() => {
           const { peer } = get();
-          if (peer && peer._pc) {
+          if (peer?._pc) {
             peer._pc.getStats().then(stats => {
               let packetsLost = 0;
               let packetsReceived = 0;
               
               stats.forEach(report => {
-                if (report.type === 'inbound-rtp' && report.kind === 'video') {
+                if (report.type === 'inbound-rtp' && report.kind === 'audio') {
                   packetsLost += report.packetsLost || 0;
                   packetsReceived += report.packetsReceived || 0;
                 }
@@ -716,7 +920,7 @@ export const useCallStore = create(
               if (lossRate > 0.1) quality = "poor";
               else if (lossRate > 0.05) quality = "medium";
               
-              set({ networkQuality: quality, connectionStats: { packetsLost, packetsReceived, lossRate } });
+              set({ networkQuality: quality });
             }).catch(() => {});
           }
         }, 3000);
@@ -725,10 +929,10 @@ export const useCallStore = create(
       },
 
       attemptReconnect: async () => {
-        const { reconnectAttempts, maxReconnectAttempts, receiver, callType } = get();
+        const { reconnectAttempts, maxReconnectAttempts } = get();
         
         if (reconnectAttempts >= maxReconnectAttempts) {
-          toast.error("Connection lost. Please try calling again.");
+          toast.error("Connection lost");
           get().endCall();
           return;
         }
@@ -738,21 +942,28 @@ export const useCallStore = create(
         
         await new Promise(resolve => setTimeout(resolve, 2000));
         
-        if (receiver && callType) {
+        // If still having issues, end call
+        if (get().networkQuality === "reconnecting") {
+          toast.error("Could not reconnect");
           get().endCall();
-          setTimeout(() => {
-            get().initiateCall(receiver, callType);
-          }, 1000);
         }
       },
       
-      clearLastCallInfo: () => set({ lastCallInfo: null }),
+      retryAcceptCall: async () => {
+        set({ permissionDenied: false, permissionType: null });
+        await get().acceptCall();
+      },
       
       cleanupCall: () => {
-        const { peer, localStream, _monitorInterval } = get();
+        const { peer, localStream, _monitorInterval, _callTimeout } = get();
+        
+        console.log("🧹 Cleaning up call state");
         
         stopRingtone();
         
+        if (_callTimeout) {
+          clearTimeout(_callTimeout);
+        }
         if (_monitorInterval) {
           clearInterval(_monitorInterval);
         }
@@ -789,7 +1000,11 @@ export const useCallStore = create(
           isVideoOff: false,
           isOnHold: false,
           reconnectAttempts: 0,
+          permissionDenied: false,
+          permissionType: null,
+          pendingCandidates: [],
           _monitorInterval: null,
+          _callTimeout: null,
         });
       },
     }),

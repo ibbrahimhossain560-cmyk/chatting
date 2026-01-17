@@ -199,11 +199,13 @@ const VideoCall = () => {
                 <p className="text-white/70 mt-1 text-sm sm:text-base">
                   {callStatus === "calling"
                     ? "Calling..."
+                    : callStatus === "connecting"
+                    ? "Connecting..."
                     : callStatus === "reconnecting"
                     ? "Reconnecting..."
                     : callStatus === "ongoing"
                     ? callDuration
-                    : "Connecting..."}
+                    : "..."}
                 </p>
                 {isOnHold && (
                   <p className="text-yellow-400 mt-1 text-xs sm:text-sm">Call on hold</p>
@@ -252,6 +254,8 @@ const VideoCall = () => {
                       ? "bg-green-500/20 text-green-400"
                       : callStatus === "reconnecting"
                       ? "bg-yellow-500/20 text-yellow-400"
+                      : callStatus === "connecting"
+                      ? "bg-blue-500/20 text-blue-400"
                       : "bg-white/10 text-white"
                   }`}
                 >
@@ -265,6 +269,11 @@ const VideoCall = () => {
                       <>
                         <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-400 rounded-full animate-pulse" />
                         <span className="font-medium">Reconnecting...</span>
+                      </>
+                    ) : callStatus === "connecting" ? (
+                      <>
+                        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-pulse" />
+                        <span className="font-medium">Connecting...</span>
                       </>
                     ) : (
                       <>
