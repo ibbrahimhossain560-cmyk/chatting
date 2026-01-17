@@ -5,10 +5,17 @@ import express from "express";
 const app = express();
 const server = http.createServer(app);
 
+// Configure Socket.IO with CORS for both development and production
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173"],
+    origin: process.env.NODE_ENV === "production" 
+      ? ["https://chatting-pro.onrender.com", process.env.CLIENT_URL].filter(Boolean)
+      : ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+    credentials: true,
   },
+  // Improve connection stability
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
 export function getReceiverSocketId(userId) {
