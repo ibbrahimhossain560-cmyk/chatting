@@ -80,7 +80,7 @@ const getIceServers = () => [
 ];
 
 // Adaptive bitrate settings for low data mode
-const getMediaConstraints = (callType, lowDataMode = false) => {
+const getMediaConstraints = (callType, lowDataMode = false, videoEnabled = true) => {
   if (callType === 'audio') {
     return {
       audio: {
@@ -88,6 +88,18 @@ const getMediaConstraints = (callType, lowDataMode = false) => {
         noiseSuppression: true,
         autoGainControl: true,
         sampleRate: lowDataMode ? 8000 : 48000,
+      },
+      video: false,
+    };
+  }
+
+  // For video calls, check if video should be included
+  if (!videoEnabled) {
+    return {
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
       },
       video: false,
     };
@@ -111,6 +123,63 @@ const getMediaConstraints = (callType, lowDataMode = false) => {
           frameRate: { ideal: 30, max: 30 },
         },
   };
+};
+
+// Helper to check and request permissions
+const checkMediaPermissions = async (audio = true, video = false) => {
+  try {
+    // Check if permissions API is available
+    if (navigator.permissions) {
+      const permissions = [];
+      
+      if (audio) {
+        try {
+          const micPermission = await navigator.permissions.query({ name: 'microphone' });
+          permissions.push({ type: 'microphone', state: micPermission.state });
+        } catch (e) {
+          // Some browsers don't support querying microphone
+        }
+      }
+      
+      if (video) {
+        try {
+          const camPermission = await navigator.permissions.query({ name: 'camera' });
+          permissions.push({ type: 'camera', state: camPermission.state });
+        } catch (e) {
+          // Some browsers don't support querying camera
+        }
+      }
+      
+      return permissions;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+};
+
+// Get media stream with better error handling
+const getMediaStream = async (constraints) => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    return { stream, error: null };
+  } catch (error) {
+    let errorMessage = "Could not access media devices";
+    
+    if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+      errorMessage = "Permission denied. Please allow access in your browser settings.";
+    } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+      errorMessage = "No camera/microphone found on this device.";
+    } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+      errorMessage = "Camera/microphone is already in use by another app.";
+    } else if (error.name === "OverconstrainedError") {
+      errorMessage = "Camera doesn't support requested settings.";
+    } else if (error.name === "TypeError") {
+      errorMessage = "No media devices available.";
+    }
+    
+    return { stream: null, error: errorMessage };
+  }
 };
 
 export const useCallStore = create((set, get) => ({
@@ -159,8 +228,32 @@ export const useCallStore = create((set, get) => ({
     }
 
     try {
-      const constraints = getMediaConstraints(type, lowDataMode);
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // For audio calls, only request audio permission
+      // For video calls, try video first, but fallback to audio-only if camera fails
+      const isVideoCall = type === 'video';
+      let constraints = getMediaConstraints(type, lowDataMode, isVideoCall);
+      
+      // Try to get media stream
+      let { stream, error } = await getMediaStream(constraints);
+      
+      // If video call failed to get camera, try audio only
+      if (!stream && isVideoCall) {
+        toast("Camera not available, starting audio-only call", { icon: "🎤" });
+        constraints = getMediaConstraints('audio', lowDataMode);
+        const fallbackResult = await getMediaStream(constraints);
+        stream = fallbackResult.stream;
+        error = fallbackResult.error;
+        
+        // Switch to audio call type
+        if (stream) {
+          type = 'audio';
+        }
+      }
+      
+      if (!stream) {
+        toast.error(error || "Could not access microphone");
+        return;
+      }
       
       set({
         callStatus: "calling",
@@ -168,6 +261,7 @@ export const useCallStore = create((set, get) => ({
         receiver: receiverUser,
         localStream: stream,
         reconnectAttempts: 0,
+        isVideoOff: type === 'audio',
       });
 
       const peer = new Peer({
@@ -248,7 +342,7 @@ export const useCallStore = create((set, get) => ({
   },
 
   acceptCall: async () => {
-    const { callType, incomingSignal, caller, lowDataMode } = get();
+    let { callType, incomingSignal, caller, lowDataMode } = get();
     const socket = useAuthStore.getState().socket;
     
     stopRingtone();
@@ -256,14 +350,41 @@ export const useCallStore = create((set, get) => ({
     if (!socket || !incomingSignal) return;
 
     try {
-      const constraints = getMediaConstraints(callType, lowDataMode);
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // For audio calls, only request audio permission
+      // For video calls, try video first, but fallback to audio-only if camera fails
+      const isVideoCall = callType === 'video';
+      let constraints = getMediaConstraints(callType, lowDataMode, isVideoCall);
+      
+      // Try to get media stream
+      let { stream, error } = await getMediaStream(constraints);
+      
+      // If video call failed to get camera, try audio only
+      if (!stream && isVideoCall) {
+        toast("Camera not available, joining with audio only", { icon: "🎤" });
+        constraints = getMediaConstraints('audio', lowDataMode);
+        const fallbackResult = await getMediaStream(constraints);
+        stream = fallbackResult.stream;
+        error = fallbackResult.error;
+        
+        // Switch to audio call type
+        if (stream) {
+          callType = 'audio';
+        }
+      }
+      
+      if (!stream) {
+        toast.error(error || "Could not access microphone");
+        get().rejectCall();
+        return;
+      }
       
       set({ 
         localStream: stream, 
         callStatus: "ongoing", 
         callStartTime: Date.now(),
         reconnectAttempts: 0,
+        callType: callType,
+        isVideoOff: callType === 'audio',
       });
 
       const peer = new Peer({
@@ -493,13 +614,47 @@ export const useCallStore = create((set, get) => ({
     }
   },
 
-  toggleVideo: () => {
-    const { localStream, isVideoOff } = get();
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.enabled = isVideoOff;
-        set({ isVideoOff: !isVideoOff });
+  toggleVideo: async () => {
+    const { localStream, isVideoOff, peer, callType } = get();
+    if (!localStream) return;
+    
+    const videoTrack = localStream.getVideoTracks()[0];
+    
+    if (videoTrack) {
+      // If we have a video track, just toggle it
+      videoTrack.enabled = isVideoOff;
+      set({ isVideoOff: !isVideoOff });
+    } else if (isVideoOff) {
+      // No video track exists, try to add one (upgrading from audio to video)
+      try {
+        const { stream, error } = await getMediaStream({ video: true, audio: false });
+        
+        if (!stream) {
+          toast.error(error || "Could not access camera");
+          return;
+        }
+        
+        const newVideoTrack = stream.getVideoTracks()[0];
+        
+        if (newVideoTrack && peer && peer._pc) {
+          // Add the video track to the peer connection
+          const senders = peer._pc.getSenders();
+          const videoSender = senders.find(s => s.track?.kind === 'video');
+          
+          if (videoSender) {
+            await videoSender.replaceTrack(newVideoTrack);
+          } else {
+            peer._pc.addTrack(newVideoTrack, localStream);
+          }
+          
+          // Add track to local stream
+          localStream.addTrack(newVideoTrack);
+          set({ isVideoOff: false, callType: 'video' });
+          toast.success("Camera enabled", { icon: "📹" });
+        }
+      } catch (error) {
+        console.error("Failed to enable video:", error);
+        toast.error("Could not enable camera");
       }
     }
   },

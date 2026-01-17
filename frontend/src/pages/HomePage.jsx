@@ -17,12 +17,12 @@ const HomePage = () => {
           transition={{ duration: 0.4 }}
           className="bg-base-100 sm:rounded-2xl shadow-2xl w-full max-w-6xl h-full sm:h-[calc(100vh-6rem)] overflow-hidden border-0 sm:border border-base-300"
         >
-          <div className="flex h-full">
-            {/* Sidebar - Hidden on mobile when chat is selected */}
+          <div className="flex h-full relative">
+            {/* Sidebar - Always visible on desktop, visible on mobile when no chat selected */}
             <div
               className={`${
                 selectedUser ? "hidden md:flex" : "flex"
-              } w-full md:w-auto`}
+              } w-full md:w-auto h-full`}
             >
               <Sidebar />
             </div>
@@ -44,9 +44,9 @@ const HomePage = () => {
                   key="chat"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="flex-1 flex flex-col w-full"
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex-1 flex flex-col w-full h-full absolute md:relative inset-0 bg-base-100 z-10"
                 >
                   <ChatContainer />
                 </motion.div>

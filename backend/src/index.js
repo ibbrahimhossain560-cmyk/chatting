@@ -10,6 +10,7 @@ import { connectDB } from "./lib/db.js";
 
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
+import adminRoutes from "./routes/admin.route.js";
 import { app, server } from "./lib/socket.js";
 
 // Load environment variables
@@ -22,19 +23,20 @@ const __dirname = path.dirname(__filename);
 // Connect to DB first
 connectDB();
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 app.use(
   cors({
     origin: process.env.NODE_ENV === "production" 
       ? ["https://chatting-pro.onrender.com", process.env.CLIENT_URL].filter(Boolean)
-      : ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
+      : ["http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176"],
     credentials: true,
   })
 );
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/admin", adminRoutes);
 
 if (process.env.NODE_ENV === "production") {
   // In production on Render, frontend is built at root/frontend/dist

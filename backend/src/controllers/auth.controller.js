@@ -4,19 +4,34 @@ import bcrypt from "bcryptjs";
 import cloudinary from "../lib/cloudinary.js";
 
 export const signup = async (req, res) => {
-  const { fullName, email, password } = req.body;
+  const { fullName, email, password, username } = req.body;
   try {
-    if (!fullName || !email || !password) {
+    if (!fullName || !email || !password || !username) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // Validate username
+    if (username.length < 3 || username.length > 20) {
+      return res.status(400).json({ message: "Username must be 3-20 characters" });
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      return res.status(400).json({ message: "Username can only contain letters, numbers, and underscores" });
     }
 
     if (password.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
 
-    const user = await User.findOne({ email });
+    // Check if email exists
+    const emailExists = await User.findOne({ email });
+    if (emailExists) return res.status(400).json({ message: "Email already exists" });
 
-    if (user) return res.status(400).json({ message: "Email already exists" });
+    // Check if username exists
+    const usernameExists = await User.findOne({ 
+      username: { $regex: new RegExp(`^${username}$`, 'i') } 
+    });
+    if (usernameExists) return res.status(400).json({ message: "Username already taken" });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
@@ -24,6 +39,7 @@ export const signup = async (req, res) => {
     const newUser = new User({
       fullName,
       email,
+      username: username.toLowerCase(),
       password: hashedPassword,
     });
 
@@ -36,7 +52,11 @@ export const signup = async (req, res) => {
         _id: newUser._id,
         fullName: newUser.fullName,
         email: newUser.email,
+        username: newUser.username,
         profilePic: newUser.profilePic,
+        badge: newUser.badge,
+        badgeType: newUser.badgeType,
+        isPremium: newUser.isPremium,
       });
     } else {
       res.status(400).json({ message: "Invalid user data" });
@@ -50,10 +70,20 @@ export const signup = async (req, res) => {
 export const login = async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await User.findOne({ email });
+    // Allow login with email or username
+    const user = await User.findOne({
+      $or: [
+        { email: email },
+        { username: { $regex: new RegExp(`^${email}$`, 'i') } }
+      ]
+    });
 
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    if (user.isBanned) {
+      return res.status(403).json({ message: `Account banned: ${user.banReason || "Contact admin"}` });
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
@@ -67,7 +97,11 @@ export const login = async (req, res) => {
       _id: user._id,
       fullName: user.fullName,
       email: user.email,
+      username: user.username,
       profilePic: user.profilePic,
+      badge: user.badge,
+      badgeType: user.badgeType,
+      isPremium: user.isPremium,
     });
   } catch (error) {
     console.log("Error in login controller", error.message);
@@ -87,23 +121,91 @@ export const logout = (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { profilePic } = req.body;
+    const { profilePic, username, fullName } = req.body;
     const userId = req.user._id;
 
-    if (!profilePic) {
-      return res.status(400).json({ message: "Profile pic is required" });
+    const updateData = {};
+
+    if (profilePic) {
+      const uploadResponse = await cloudinary.uploader.upload(profilePic);
+      updateData.profilePic = uploadResponse.secure_url;
     }
 
-    const uploadResponse = await cloudinary.uploader.upload(profilePic);
+    if (fullName) {
+      updateData.fullName = fullName;
+    }
+
+    // Handle username update (once per month for regular users)
+    if (username) {
+      // Validate username
+      if (username.length < 3 || username.length > 20) {
+        return res.status(400).json({ message: "Username must be 3-20 characters" });
+      }
+
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        return res.status(400).json({ message: "Username can only contain letters, numbers, and underscores" });
+      }
+
+      // Check if username is taken
+      const existingUser = await User.findOne({ 
+        username: { $regex: new RegExp(`^${username}$`, 'i') },
+        _id: { $ne: userId }
+      });
+
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already taken" });
+      }
+
+      // Check if user can change username (once per month)
+      const user = await User.findById(userId);
+      if (user.lastUsernameChange) {
+        const daysSinceLastChange = (Date.now() - new Date(user.lastUsernameChange).getTime()) / (1000 * 60 * 60 * 24);
+        if (daysSinceLastChange < 30) {
+          const daysLeft = Math.ceil(30 - daysSinceLastChange);
+          return res.status(400).json({ message: `You can change your username in ${daysLeft} days` });
+        }
+      }
+
+      updateData.username = username.toLowerCase();
+      updateData.lastUsernameChange = new Date();
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: "No data to update" });
+    }
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { profilePic: uploadResponse.secure_url },
+      updateData,
       { new: true }
-    );
+    ).select("-password");
 
     res.status(200).json(updatedUser);
   } catch (error) {
     console.log("error in update profile:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Check username availability
+export const checkUsername = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    if (!username || username.length < 3) {
+      return res.status(400).json({ available: false, message: "Username too short" });
+    }
+
+    const existingUser = await User.findOne({ 
+      username: { $regex: new RegExp(`^${username}$`, 'i') }
+    });
+
+    res.status(200).json({ 
+      available: !existingUser,
+      message: existingUser ? "Username taken" : "Username available"
+    });
+  } catch (error) {
+    console.log("Error in checkUsername:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

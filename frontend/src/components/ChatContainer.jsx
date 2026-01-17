@@ -104,21 +104,38 @@ const ChatContainer = () => {
   };
 
   const isTyping = typingUsers[selectedUser?._id];
-  const displayMessages = searchQuery ? searchResults : messages;
+  
+  // Sort messages by timestamp and apply search filter if needed
+  const sortedMessages = [...messages].sort((a, b) => 
+    new Date(a.createdAt) - new Date(b.createdAt)
+  );
+  const sortedSearchResults = [...searchResults].sort((a, b) => 
+    new Date(a.createdAt) - new Date(b.createdAt)
+  );
+  const displayMessages = searchQuery ? sortedSearchResults : sortedMessages;
 
   if (isMessagesLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-auto bg-base-100">
-        <ChatHeader />
-        <MessageSkeleton />
-        <MessageInput />
+      <div className="flex-1 flex flex-col overflow-hidden bg-base-100">
+        <div className="flex-shrink-0">
+          <ChatHeader />
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <MessageSkeleton />
+        </div>
+        <div className="flex-shrink-0">
+          <MessageInput />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-base-100 to-base-200/30">
-      <ChatHeader />
+    <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-base-100 to-base-200/30 h-full">
+      {/* Fixed header */}
+      <div className="flex-shrink-0">
+        <ChatHeader />
+      </div>
 
       {/* Search bar */}
       <AnimatePresence>
@@ -127,7 +144,7 @@ const ChatContainer = () => {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="border-b border-base-200 overflow-hidden"
+            className="border-b border-base-200 overflow-hidden flex-shrink-0"
           >
             <div className="p-2 flex items-center gap-2">
               <div className="relative flex-1">
@@ -165,9 +182,9 @@ const ChatContainer = () => {
         )}
       </AnimatePresence>
 
-      {/* Messages area */}
+      {/* Messages area - scrollable */}
       <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4">
-        {messages.length === 0 && (
+        {sortedMessages.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -408,7 +425,10 @@ const ChatContainer = () => {
         </AnimatePresence>
       </div>
 
-      <MessageInput />
+      {/* Fixed input at bottom */}
+      <div className="flex-shrink-0">
+        <MessageInput />
+      </div>
 
       {/* Forward modal */}
       <AnimatePresence>

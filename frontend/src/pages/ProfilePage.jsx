@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { Camera, Mail, User, Bell, BellOff, Eye, EyeOff, Calendar, Shield } from "lucide-react";
+import { Camera, Mail, User, Bell, BellOff, Eye, EyeOff, Calendar, Shield, AtSign, Edit3, Save, X } from "lucide-react";
 import { useNotificationStore } from "../store/useNotificationStore";
 import { notificationManager } from "../lib/notifications";
 import { motion } from "framer-motion";
+import Badge, { BadgeSelector, PREMIUM_BADGES } from "../components/Badge";
+import toast from "react-hot-toast";
 
 const ProfilePage = () => {
   const { authUser, isUpdatingProfile, updateProfile } = useAuthStore();
@@ -16,6 +18,9 @@ const ProfilePage = () => {
     setShowMessagePreview,
   } = useNotificationStore();
   const [selectedImg, setSelectedImg] = useState(null);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [newUsername, setNewUsername] = useState(authUser?.username || "");
+  const [showBadgeSelector, setShowBadgeSelector] = useState(false);
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -49,6 +54,41 @@ const ProfilePage = () => {
       setNotificationsEnabled(enabled);
     }
   };
+
+  const handleUsernameUpdate = async () => {
+    if (!newUsername || newUsername === authUser?.username) {
+      setIsEditingUsername(false);
+      return;
+    }
+    
+    try {
+      await updateProfile({ username: newUsername });
+      setIsEditingUsername(false);
+      toast.success("Username updated!");
+    } catch (error) {
+      // Error is handled in updateProfile
+    }
+  };
+
+  const handleBadgeSelect = async (badgeType) => {
+    if (!authUser?.isPremium && badgeType !== "none") {
+      toast.error("Premium required to use badges");
+      return;
+    }
+    // Note: Badge selection for regular users would need a separate endpoint
+    // For now, only admin can assign badges
+    setShowBadgeSelector(false);
+  };
+
+  // Calculate days until username can be changed
+  const getDaysUntilUsernameChange = () => {
+    if (!authUser?.lastUsernameChange) return 0;
+    const daysSinceChange = (Date.now() - new Date(authUser.lastUsernameChange).getTime()) / (1000 * 60 * 60 * 24);
+    return Math.max(0, Math.ceil(30 - daysSinceChange));
+  };
+
+  const canChangeUsername = getDaysUntilUsernameChange() === 0;
+  
   return (
     <div className="min-h-screen pt-16 sm:pt-20 pb-8 bg-gradient-to-b from-base-100 to-base-200">
       <div className="max-w-2xl mx-auto px-4 py-4 sm:py-8">
@@ -97,8 +137,17 @@ const ProfilePage = () => {
                 </label>
               </motion.div>
               <div className="text-center">
-                <h2 className="text-xl sm:text-2xl font-bold">{authUser?.fullName}</h2>
+                <h2 className="text-xl sm:text-2xl font-bold flex items-center justify-center gap-2">
+                  {authUser?.fullName}
+                  <Badge badgeType={authUser?.badgeType} size="md" />
+                </h2>
                 <p className="text-sm text-base-content/60 mt-1">
+                  @{authUser?.username || "username"}
+                </p>
+                {authUser?.isPremium && (
+                  <span className="badge badge-warning badge-sm mt-2">✨ Premium</span>
+                )}
+                <p className="text-xs text-base-content/40 mt-2">
                   {isUpdatingProfile ? "Uploading..." : "Tap to change photo"}
                 </p>
               </div>
@@ -115,6 +164,53 @@ const ProfilePage = () => {
                   Full Name
                 </div>
                 <p className="font-medium text-lg">{authUser?.fullName}</p>
+              </motion.div>
+
+              <motion.div 
+                whileHover={{ scale: 1.02 }}
+                className="bg-base-200/50 rounded-xl p-4 space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-base-content/60 text-sm">
+                    <AtSign className="w-4 h-4" />
+                    Username
+                  </div>
+                  {canChangeUsername && !isEditingUsername && (
+                    <button 
+                      onClick={() => setIsEditingUsername(true)}
+                      className="btn btn-ghost btn-xs"
+                    >
+                      <Edit3 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+                {isEditingUsername ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                      className="input input-sm input-bordered flex-1"
+                      placeholder="username"
+                      maxLength={20}
+                    />
+                    <button onClick={handleUsernameUpdate} className="btn btn-sm btn-primary">
+                      <Save className="w-3 h-3" />
+                    </button>
+                    <button onClick={() => setIsEditingUsername(false)} className="btn btn-sm btn-ghost">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="font-medium text-lg">@{authUser?.username || "—"}</p>
+                    {!canChangeUsername && (
+                      <p className="text-xs text-base-content/40">
+                        Can change in {getDaysUntilUsernameChange()} days
+                      </p>
+                    )}
+                  </div>
+                )}
               </motion.div>
 
               <motion.div 

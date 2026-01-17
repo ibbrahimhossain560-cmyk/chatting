@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, User } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, User, AtSign, Check, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { axiosInstance } from "../lib/axios";
 
 import AuthImagePattern from "../components/AuthImagePattern";
 import toast from "react-hot-toast";
@@ -11,14 +12,44 @@ const SignUpPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
+    username: "",
     email: "",
     password: "",
   });
+  const [usernameStatus, setUsernameStatus] = useState(null); // null, 'checking', 'available', 'taken'
 
   const { signup, isSigningUp } = useAuthStore();
 
+  const checkUsername = async (username) => {
+    if (username.length < 3) {
+      setUsernameStatus(null);
+      return;
+    }
+    
+    setUsernameStatus('checking');
+    try {
+      const res = await axiosInstance.get(`/auth/check-username/${username}`);
+      setUsernameStatus(res.data.available ? 'available' : 'taken');
+    } catch (error) {
+      setUsernameStatus(null);
+    }
+  };
+
+  const handleUsernameChange = (e) => {
+    const value = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    setFormData({ ...formData, username: value });
+    
+    // Debounce the check
+    clearTimeout(window.usernameCheckTimeout);
+    window.usernameCheckTimeout = setTimeout(() => checkUsername(value), 500);
+  };
+
   const validateForm = () => {
     if (!formData.fullName.trim()) return toast.error("Full name is required");
+    if (!formData.username.trim()) return toast.error("Username is required");
+    if (formData.username.length < 3) return toast.error("Username must be at least 3 characters");
+    if (!/^[a-z0-9_]+$/.test(formData.username)) return toast.error("Username can only contain lowercase letters, numbers, and underscores");
+    if (usernameStatus === 'taken') return toast.error("Username is already taken");
     if (!formData.email.trim()) return toast.error("Email is required");
     if (!/\S+@\S+\.\S+/.test(formData.email)) return toast.error("Invalid email format");
     if (!formData.password) return toast.error("Password is required");
@@ -88,6 +119,44 @@ const SignUpPage = () => {
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 />
               </div>
+            </div>
+
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text font-medium">Username</span>
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <AtSign className="size-5 text-base-content/40" />
+                </div>
+                <input
+                  type="text"
+                  className={`input input-bordered w-full pl-12 pr-10 bg-base-200/50 focus:bg-base-100 transition-colors ${
+                    usernameStatus === 'available' ? 'input-success' : 
+                    usernameStatus === 'taken' ? 'input-error' : ''
+                  }`}
+                  placeholder="johndoe"
+                  value={formData.username}
+                  onChange={handleUsernameChange}
+                  maxLength={20}
+                />
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                  {usernameStatus === 'checking' && (
+                    <span className="loading loading-spinner loading-xs" />
+                  )}
+                  {usernameStatus === 'available' && (
+                    <Check className="size-5 text-success" />
+                  )}
+                  {usernameStatus === 'taken' && (
+                    <X className="size-5 text-error" />
+                  )}
+                </div>
+              </div>
+              <label className="label">
+                <span className="label-text-alt text-base-content/50">
+                  Letters, numbers, and underscores only
+                </span>
+              </label>
             </div>
 
             <div className="form-control">

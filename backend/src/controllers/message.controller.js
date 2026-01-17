@@ -27,7 +27,9 @@ export const getMessages = async (req, res) => {
         { senderId: userToChatId, receiverId: myId },
       ],
       deletedForEveryone: { $ne: true },
-    }).populate("replyTo", "text image senderId");
+    })
+      .populate("replyTo", "text image senderId")
+      .sort({ createdAt: 1 }); // Sort by timestamp ascending
 
     // Mark messages as read
     await Message.updateMany(
