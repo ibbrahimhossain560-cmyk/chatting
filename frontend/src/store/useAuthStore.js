@@ -155,6 +155,11 @@ export const useAuthStore = create((set, get) => ({
       useCallStore.getState().cleanupCall();
     });
 
+    // Handle ICE candidate
+    socket.on("iceCandidate", (data) => {
+      useCallStore.getState().handleIceCandidate(data.candidate);
+    });
+
     // ============ End WebRTC Call Event Listeners ============
   },
 
