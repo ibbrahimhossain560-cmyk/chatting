@@ -5,6 +5,10 @@ import App from "./App.jsx";
 
 import { BrowserRouter } from "react-router-dom";
 
+// Polyfill for simple-peer (WebRTC)
+import { Buffer } from 'buffer';
+window.Buffer = Buffer;
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>

@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import Peer from "simple-peer";
 import { useAuthStore } from "./useAuthStore";
 import toast from "react-hot-toast";
 
@@ -84,7 +83,7 @@ const getIceServers = () => [
   },
 ];
 
-// Simple media stream getter
+// Get media stream
 const getMediaStream = async (wantVideo = false) => {
   console.log("getMediaStream called, wantVideo:", wantVideo);
   
@@ -115,13 +114,11 @@ const getMediaStream = async (wantVideo = false) => {
     let errorMessage = "Could not access media devices";
     
     if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-      errorMessage = "Please allow camera/microphone access. Click the camera icon in your browser's address bar.";
+      errorMessage = "Please allow camera/microphone access";
     } else if (err.name === "NotFoundError") {
-      errorMessage = "No camera/microphone found on this device.";
+      errorMessage = "No camera/microphone found";
     } else if (err.name === "NotReadableError") {
-      errorMessage = "Camera/microphone is being used by another app.";
-    } else if (err.name === "OverconstrainedError") {
-      errorMessage = "Device doesn't support the requested settings.";
+      errorMessage = "Camera/microphone is being used by another app";
     }
     
     return { stream: null, error: errorMessage };
@@ -144,6 +141,21 @@ export const formatCallDuration = (seconds) => {
   return `${secs} sec${secs !== 1 ? 's' : ''}`;
 };
 
+// Dynamically import simple-peer to avoid SSR issues
+let SimplePeer = null;
+const loadSimplePeer = async () => {
+  if (SimplePeer) return SimplePeer;
+  try {
+    const module = await import('simple-peer');
+    SimplePeer = module.default || module;
+    console.log("SimplePeer loaded successfully");
+    return SimplePeer;
+  } catch (err) {
+    console.error("Failed to load simple-peer:", err);
+    return null;
+  }
+};
+
 export const useCallStore = create(
   persist(
     (set, get) => ({
@@ -154,6 +166,7 @@ export const useCallStore = create(
       localStream: null,
       remoteStream: null,
       peer: null,
+      peerConnection: null,
       callStartTime: null,
       isMuted: false,
       isVideoOff: false,
@@ -167,9 +180,7 @@ export const useCallStore = create(
       reconnectAttempts: 0,
       maxReconnectAttempts: 5,
       _monitorInterval: null,
-      
-      // Call history for chat display
-      lastCallInfo: null, // { duration, type, endedAt, withUser }
+      lastCallInfo: null,
 
       setLowDataMode: (enabled) => set({ lowDataMode: enabled }),
 
@@ -213,6 +224,14 @@ export const useCallStore = create(
         const loadingToast = toast.loading("Setting up call...");
         
         try {
+          // Load simple-peer dynamically
+          const Peer = await loadSimplePeer();
+          if (!Peer) {
+            toast.dismiss(loadingToast);
+            toast.error("Call module not available. Please refresh.");
+            return;
+          }
+
           const result = await getMediaStream(isVideoCall);
           
           toast.dismiss(loadingToast);
@@ -239,6 +258,7 @@ export const useCallStore = create(
             isVideoOff: actualCallType === 'audio',
           });
 
+          // Create peer connection
           const peer = new Peer({
             initiator: true,
             trickle: true,
@@ -279,7 +299,7 @@ export const useCallStore = create(
             if (get().callStatus === "ongoing") {
               get().attemptReconnect();
             } else {
-              toast.error("Call connection failed: " + err.message);
+              toast.error("Call connection failed");
               get().endCall();
             }
           });
@@ -297,7 +317,8 @@ export const useCallStore = create(
         } catch (error) {
           toast.dismiss(loadingToast);
           console.error("Call initiation error:", error);
-          toast.error("Failed to start call: " + error.message);
+          toast.error("Failed to start call. Please try again.");
+          get().cleanupCall();
         }
       },
 
@@ -318,6 +339,15 @@ export const useCallStore = create(
         const loadingToast = toast.loading("Connecting...");
         
         try {
+          // Load simple-peer dynamically
+          const Peer = await loadSimplePeer();
+          if (!Peer) {
+            toast.dismiss(loadingToast);
+            toast.error("Call module not available. Please refresh.");
+            get().rejectCall();
+            return;
+          }
+
           const result = await getMediaStream(isVideoCall);
           
           toast.dismiss(loadingToast);
@@ -375,18 +405,19 @@ export const useCallStore = create(
             if (get().callStatus === "ongoing") {
               get().attemptReconnect();
             } else {
-              toast.error("Connection failed: " + err.message);
+              toast.error("Connection failed");
               get().endCall();
             }
           });
 
+          // Signal with incoming data
           peer.signal(incomingSignal);
           set({ peer });
           
         } catch (error) {
           toast.dismiss(loadingToast);
           console.error("Accept call error:", error);
-          toast.error("Failed to answer call: " + error.message);
+          toast.error("Failed to answer call");
           get().rejectCall();
         }
       },
@@ -440,13 +471,20 @@ export const useCallStore = create(
         }
         
         if (peer) {
-          peer.destroy();
+          try {
+            peer.destroy();
+          } catch (e) {
+            console.log("Error destroying peer:", e);
+          }
         }
         
         if (localStream) {
           localStream.getTracks().forEach(track => {
-            track.stop();
-            console.log("Stopped track:", track.kind);
+            try {
+              track.stop();
+            } catch (e) {
+              console.log("Error stopping track:", e);
+            }
           });
         }
         
@@ -476,7 +514,11 @@ export const useCallStore = create(
         console.log("Call accepted, signaling peer");
         const { peer } = get();
         if (peer) {
-          peer.signal(signal);
+          try {
+            peer.signal(signal);
+          } catch (e) {
+            console.error("Error signaling peer:", e);
+          }
         }
       },
 
@@ -556,10 +598,9 @@ export const useCallStore = create(
                 width: { ideal: 1280 },
                 height: { ideal: 720 },
               },
-              audio: false, // Don't get new audio, keep existing
+              audio: false,
             });
           } catch (exactError) {
-            // If exact facingMode fails, try without exact
             console.log("Exact facingMode failed, trying ideal:", exactError);
             newStream = await navigator.mediaDevices.getUserMedia({
               video: { 
@@ -592,7 +633,6 @@ export const useCallStore = create(
           localStream.removeTrack(currentVideoTrack);
           localStream.addTrack(newVideoTrack);
           
-          // Apply video off state if needed
           if (isVideoOff) {
             newVideoTrack.enabled = false;
           }
@@ -605,22 +645,7 @@ export const useCallStore = create(
           toast.success(`Switched to ${!usingFrontCamera ? 'front' : 'back'} camera`);
         } catch (error) {
           console.error("Failed to switch camera:", error);
-          
-          // Try to restore the camera if switch failed
-          try {
-            const fallbackStream = await navigator.mediaDevices.getUserMedia({
-              video: { facingMode: usingFrontCamera ? 'user' : 'environment' },
-              audio: false,
-            });
-            const fallbackTrack = fallbackStream.getVideoTracks()[0];
-            if (fallbackTrack) {
-              localStream.addTrack(fallbackTrack);
-            }
-          } catch (restoreError) {
-            console.error("Failed to restore camera:", restoreError);
-          }
-          
-          toast.error("Could not switch camera. Device may only have one camera.");
+          toast.error("Could not switch camera");
         }
       },
 
@@ -643,7 +668,7 @@ export const useCallStore = create(
               
               let quality = "good";
               if (lossRate > 0.1) quality = "poor";
-              else if (lossRate > 0.05) quality = "fair";
+              else if (lossRate > 0.05) quality = "medium";
               
               set({ networkQuality: quality, connectionStats: { packetsLost, packetsReceived, lossRate } });
             }).catch(() => {});
@@ -675,10 +700,8 @@ export const useCallStore = create(
         }
       },
       
-      // Clear last call info after it's been displayed
       clearLastCallInfo: () => set({ lastCallInfo: null }),
       
-      // Cleanup call (called when call fails)
       cleanupCall: () => {
         const { peer, localStream, _monitorInterval } = get();
         

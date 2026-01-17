@@ -249,7 +249,7 @@ const MessageBubble = ({
         )}
       </motion.div>
 
-      {/* Long press popup menu */}
+      {/* Long press popup menu - centered and compact */}
       <AnimatePresence>
         {showPopup && (
           <>
@@ -257,90 +257,97 @@ const MessageBubble = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[60] bg-black/40"
+              className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
               onClick={() => { setShowPopup(false); setShowDeleteOptions(false); }}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.8, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: 10 }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] bg-base-100 rounded-2xl shadow-2xl border border-base-300 w-[280px] max-w-[90vw] overflow-hidden"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="fixed z-[70] bg-base-100 rounded-xl shadow-2xl border border-base-300 overflow-hidden"
+              style={{
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: 'min(260px, 85vw)',
+                maxHeight: '80vh',
+              }}
             >
               {/* Message preview */}
-              <div className="p-3 border-b border-base-200 bg-base-200/30">
-                <p className="text-sm truncate">{message.text || (message.image ? "📷 Photo" : "🎤 Voice")}</p>
+              <div className="p-2.5 border-b border-base-200 bg-base-200/30">
+                <p className="text-xs truncate">{message.text || (message.image ? "📷 Photo" : "🎤 Voice")}</p>
               </div>
 
               {/* Quick reactions */}
-              <div className="flex justify-center gap-1 p-2 border-b border-base-200">
+              <div className="flex justify-center gap-0.5 p-1.5 border-b border-base-200">
                 {REACTION_EMOJIS.map((emoji) => (
                   <button
                     key={emoji}
                     onClick={() => { onReaction(message._id, emoji); setShowPopup(false); }}
-                    className="text-xl hover:scale-125 transition-transform p-1"
+                    className="text-lg hover:scale-110 transition-transform p-1"
                   >
                     {emoji}
                   </button>
                 ))}
               </div>
 
-              {/* Actions */}
-              <div className="py-1">
-                <button onClick={() => { onReply(message); setShowPopup(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 text-sm">
-                  <Reply className="size-4" /> Reply
+              {/* Actions - compact */}
+              <div className="py-0.5 max-h-[40vh] overflow-y-auto">
+                <button onClick={() => { onReply(message); setShowPopup(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-base-200 text-xs">
+                  <Reply className="size-3.5" /> Reply
                 </button>
                 
                 {message.text && (
-                  <button onClick={handleCopy} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 text-sm">
-                    <Copy className="size-4" /> Copy
+                  <button onClick={handleCopy} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-base-200 text-xs">
+                    <Copy className="size-3.5" /> Copy
                   </button>
                 )}
                 
                 {isOwnMessage && message.text && (
-                  <button onClick={handleEdit} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 text-sm">
-                    <Edit2 className="size-4" /> Edit
+                  <button onClick={handleEdit} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-base-200 text-xs">
+                    <Edit2 className="size-3.5" /> Edit
                   </button>
                 )}
                 
-                <button onClick={() => { onForward(message); setShowPopup(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 text-sm">
-                  <Forward className="size-4" /> Forward
+                <button onClick={() => { onForward(message); setShowPopup(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-base-200 text-xs">
+                  <Forward className="size-3.5" /> Forward
                 </button>
                 
-                <button onClick={() => { onStar(message._id); setShowPopup(false); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 text-sm">
-                  <Star className={`size-4 ${isStarred ? "fill-warning text-warning" : ""}`} /> {isStarred ? "Unstar" : "Star"}
+                <button onClick={() => { onStar(message._id); setShowPopup(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-base-200 text-xs">
+                  <Star className={`size-3.5 ${isStarred ? "fill-warning text-warning" : ""}`} /> {isStarred ? "Unstar" : "Star"}
                 </button>
 
                 {/* Delete options */}
                 {!showDeleteOptions ? (
-                  <button onClick={() => setShowDeleteOptions(true)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-error/10 text-error text-sm">
-                    <Trash2 className="size-4" /> Delete
+                  <button onClick={() => setShowDeleteOptions(true)} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-error/10 text-error text-xs">
+                    <Trash2 className="size-3.5" /> Delete
                   </button>
                 ) : (
-                  <div className="border-t border-base-200 mt-1 pt-1">
-                    <p className="text-xs text-center text-base-content/60 py-1">Delete message?</p>
+                  <div className="border-t border-base-200 mt-0.5 pt-0.5">
+                    <p className="text-[10px] text-center text-base-content/60 py-1">Delete message?</p>
                     <button 
                       onClick={() => handleDelete(false)} 
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 text-sm"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-base-200 text-xs"
                     >
-                      <Trash2 className="size-4" /> Delete for me
+                      <Trash2 className="size-3.5" /> Delete for me
                     </button>
                     {isOwnMessage && (
                       <button 
                         onClick={() => handleDelete(true)} 
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-error/10 text-error text-sm"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-error/10 text-error text-xs"
                       >
-                        <Trash2 className="size-4" /> Unsend for everyone
+                        <Trash2 className="size-3.5" /> Unsend for everyone
                       </button>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Close button */}
-              <div className="border-t border-base-200 p-2">
+              {/* Close button - compact */}
+              <div className="border-t border-base-200 p-1.5">
                 <button 
                   onClick={() => { setShowPopup(false); setShowDeleteOptions(false); }} 
-                  className="w-full btn btn-sm btn-ghost"
+                  className="w-full btn btn-xs btn-ghost text-xs"
                 >
                   Cancel
                 </button>

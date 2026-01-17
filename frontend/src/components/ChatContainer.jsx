@@ -126,14 +126,17 @@ const ChatContainer = () => {
 
   if (isMessagesLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden bg-base-100 h-full">
-        <div className="flex-shrink-0">
+      <div className="flex-1 flex flex-col overflow-hidden bg-base-100 h-full relative">
+        {/* Fixed header at top */}
+        <div className="absolute top-0 left-0 right-0 z-30">
           <ChatHeader />
         </div>
-        <div className="flex-1 overflow-y-auto">
+        {/* Content with top padding for header */}
+        <div className="flex-1 overflow-y-auto mt-14">
           <MessageSkeleton />
         </div>
-        <div className="flex-shrink-0">
+        {/* Fixed input at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 z-20 bg-base-100">
           <MessageInput />
         </div>
       </div>
@@ -141,20 +144,20 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-base-100 to-base-200/30 h-full">
-      {/* Header - not sticky, just at top */}
-      <div className="flex-shrink-0 z-20">
+    <div className="flex-1 flex flex-col overflow-hidden bg-gradient-to-b from-base-100 to-base-200/30 h-full relative">
+      {/* Fixed header - always on top like main navbar */}
+      <div className="absolute top-0 left-0 right-0 z-30 bg-base-100">
         <ChatHeader />
       </div>
 
-      {/* Search bar */}
+      {/* Search bar - below fixed header */}
       <AnimatePresence>
         {showSearch && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="border-b border-base-200 overflow-hidden flex-shrink-0"
+            className="mt-14 border-b border-base-200 overflow-hidden bg-base-100 z-20"
           >
             <div className="p-2 flex items-center gap-2">
               <div className="relative flex-1">
@@ -186,8 +189,8 @@ const ChatContainer = () => {
         )}
       </AnimatePresence>
 
-      {/* Messages area - scrollable */}
-      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 sm:space-y-3">
+      {/* Messages area - scrollable with padding for fixed header and input */}
+      <div className={`flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 sm:space-y-3 ${showSearch ? '' : 'mt-14'} mb-16 sm:mb-20`}>
         {sortedMessages.length === 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -282,10 +285,13 @@ const ChatContainer = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        
+        {/* Spacer to prevent content from hiding behind fixed input */}
+        <div className="h-4" ref={messageEndRef} />
       </div>
 
-      {/* Input at bottom */}
-      <div className="flex-shrink-0 z-10">
+      {/* Fixed input at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 bg-base-100 border-t border-base-200">
         <MessageInput />
       </div>
 

@@ -54,10 +54,10 @@ const ChatHeader = () => {
         onClose={() => setShowProfileModal(false)}
       />
 
-      {/* Fixed header with high z-index */}
-      <div className="p-2.5 sm:p-3 border-b border-base-300 bg-base-100 shadow-sm">
+      {/* Sticky header - always on top */}
+      <div className="sticky top-0 z-50 p-2 sm:p-2.5 border-b border-base-300 bg-base-100/95 backdrop-blur-md shadow-sm">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2">
             {/* Avatar - clickable for profile */}
             <motion.div
               whileHover={{ scale: 1.05 }}
@@ -77,17 +77,17 @@ const ChatHeader = () => {
               </div>
             </motion.div>
 
-            {/* User info - name and badge close together */}
-            <div className="min-w-0">
-              <div className="flex items-center gap-1">
-                <h3 className="font-semibold text-sm sm:text-base truncate max-w-[120px] sm:max-w-[180px] text-base-content">
+            {/* User info - name and badge tight together */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-0.5">
+                <h3 className="font-medium text-sm sm:text-base truncate max-w-[100px] sm:max-w-[160px] text-base-content">
                   {selectedUser.fullName}
                 </h3>
                 {selectedUser.badgeType && selectedUser.badgeType !== "none" && (
                   <Badge badgeType={selectedUser.badgeType} size="xs" />
                 )}
                 {selectedUser.isPremium && (
-                  <span className="text-xs">✨</span>
+                  <span className="text-[10px]">✨</span>
                 )}
               </div>
               <div className="flex items-center gap-1">
