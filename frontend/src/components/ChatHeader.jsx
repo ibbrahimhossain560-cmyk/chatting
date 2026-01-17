@@ -6,16 +6,28 @@ import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import Badge from "./Badge";
 import UserProfileModal from "./UserProfileModal";
-import { useState } from "react";
+import NicknameModal from "./NicknameModal";
+import { useState, useEffect } from "react";
 
 const ChatHeader = () => {
-  const { selectedUser, setSelectedUser } = useChatStore();
+  const { selectedUser, setSelectedUser, nicknames, getConversationNicknames } = useChatStore();
   const { onlineUsers } = useAuthStore();
   const { initiateCall, callStatus } = useCallStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showNicknameModal, setShowNicknameModal] = useState(false);
 
   const isOnline = onlineUsers.includes(selectedUser._id);
   const isInCall = callStatus !== "idle";
+  
+  // Get nickname for this user
+  const userNickname = nicknames[selectedUser._id]?.myNicknameForThem;
+
+  // Fetch nicknames when selected user changes
+  useEffect(() => {
+    if (selectedUser?._id) {
+      getConversationNicknames(selectedUser._id);
+    }
+  }, [selectedUser?._id, getConversationNicknames]);
 
   const handleAudioCall = () => {
     if (!isOnline) {
@@ -52,6 +64,16 @@ const ChatHeader = () => {
         user={selectedUser}
         isOpen={showProfileModal}
         onClose={() => setShowProfileModal(false)}
+        onSetNickname={() => {
+          setShowProfileModal(false);
+          setShowNicknameModal(true);
+        }}
+      />
+
+      <NicknameModal
+        user={selectedUser}
+        isOpen={showNicknameModal}
+        onClose={() => setShowNicknameModal(false)}
       />
 
       {/* Sticky header - always on top */}
@@ -77,11 +99,11 @@ const ChatHeader = () => {
               </div>
             </motion.div>
 
-            {/* User info - name and badge directly together */}
+            {/* User info - name/nickname and badge directly together */}
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-0">
                 <h3 className="font-medium text-sm sm:text-base truncate max-w-[100px] sm:max-w-[160px] text-base-content leading-none">
-                  {selectedUser.fullName}
+                  {userNickname || selectedUser.fullName}
                 </h3>
                 {selectedUser.badgeType && selectedUser.badgeType !== "none" && (
                   <Badge badgeType={selectedUser.badgeType} size="sm" className="-ml-0.5" />
@@ -92,7 +114,9 @@ const ChatHeader = () => {
                 <p className="text-xs text-base-content/60">
                   {isOnline ? "Online" : "Offline"}
                 </p>
-                {selectedUser.username && (
+                {userNickname ? (
+                  <span className="text-xs text-base-content/40 ml-1">({selectedUser.fullName})</span>
+                ) : selectedUser.username && (
                   <span className="text-xs text-base-content/40 ml-1">@{selectedUser.username}</span>
                 )}
               </div>

@@ -1,9 +1,14 @@
-import { X, Calendar, Mail, User, Shield, Crown } from "lucide-react";
+import { X, Calendar, Mail, User, Shield, Crown, Edit2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Badge from "./Badge";
+import { useChatStore } from "../store/useChatStore";
 
-const UserProfileModal = ({ user, onClose, isOpen }) => {
+const UserProfileModal = ({ user, onClose, isOpen, onSetNickname }) => {
+  const { nicknames } = useChatStore();
+  
   if (!user) return null;
+
+  const userNickname = nicknames[user._id]?.myNicknameForThem;
 
   const formatDate = (date) => {
     if (!date) return "Unknown";
@@ -170,6 +175,23 @@ const UserProfileModal = ({ user, onClose, isOpen }) => {
                       </div>
                     </div>
                   )}
+
+                  {/* Nickname section */}
+                  <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-base-200/50 rounded-lg">
+                    <Edit2 className="size-4 sm:size-5 text-primary flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] sm:text-xs text-base-content/60">Nickname</p>
+                      <p className="text-xs sm:text-sm font-medium text-base-content">
+                        {userNickname || "No nickname set"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={onSetNickname}
+                      className="btn btn-xs btn-ghost text-primary"
+                    >
+                      {userNickname ? "Change" : "Set"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

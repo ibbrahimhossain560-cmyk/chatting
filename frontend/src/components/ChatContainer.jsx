@@ -57,6 +57,16 @@ const ChatContainer = () => {
     }
   }, []);
 
+  // Scroll to the first message (top of chat)
+  const scrollToTop = useCallback(() => {
+    const firstMessageId = sortedMessages[0]?._id;
+    if (firstMessageId && messageRefs.current[firstMessageId]) {
+      messageRefs.current[firstMessageId].scrollIntoView({ behavior: "smooth", block: "start" });
+      setHighlightedMessageId(firstMessageId);
+      setTimeout(() => setHighlightedMessageId(null), 2000);
+    }
+  }, [sortedMessages]);
+
   // Show last call info when it changes
   useEffect(() => {
     if (lastCallInfo && lastCallInfo.withUserId === selectedUser?._id) {
@@ -244,6 +254,7 @@ const ChatContainer = () => {
               isStarred={starredMessages.includes(message._id)}
               onReaction={handleReaction}
               onScrollToMessage={scrollToMessage}
+              onScrollToTop={scrollToTop}
               reactions={getMessageReactions(message._id)}
               readReceipt={readReceipts[selectedUser._id]}
               playingAudio={playingAudio}

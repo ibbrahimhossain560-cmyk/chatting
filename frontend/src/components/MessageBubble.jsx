@@ -2,7 +2,7 @@ import { motion, useMotionValue, useTransform, AnimatePresence } from "framer-mo
 import { useState, useRef, useCallback } from "react";
 import { 
   Reply, Forward, Copy, Trash2, Star, Edit2, X, 
-  Check, CheckCheck, Play, Pause, SmilePlus 
+  Check, CheckCheck, Play, Pause, SmilePlus, ArrowUp
 } from "lucide-react";
 import Badge from "./Badge";
 import { formatMessageTime } from "../lib/utils";
@@ -29,6 +29,7 @@ const MessageBubble = ({
   onPlayAudio,
   audioRef,
   onScrollToMessage,
+  onScrollToTop,
 }) => {
   const [showPopup, setShowPopup] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
@@ -104,6 +105,20 @@ const MessageBubble = ({
   };
 
   const isDeleted = message.deletedForEveryone;
+  const isNicknameChange = message.messageType === "nickname_change";
+  const isSystemMessage = message.messageType === "system" || isNicknameChange;
+
+  // Render system/nickname change messages differently
+  if (isSystemMessage) {
+    return (
+      <div className="flex justify-center my-2">
+        <div className="bg-base-200/70 px-3 py-1.5 rounded-full text-xs text-base-content/70">
+          <span className="font-medium">{isOwnMessage ? "You" : selectedUser.fullName}</span>
+          {" "}{message.text}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`chat ${isOwnMessage ? "chat-end" : "chat-start"} relative`}>
@@ -309,6 +324,10 @@ const MessageBubble = ({
                 
                 <button onClick={() => { onStar(message._id); setShowPopup(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-base-200 text-xs">
                   <Star className={`size-3.5 ${isStarred ? "fill-warning text-warning" : ""}`} /> {isStarred ? "Unstar" : "Star"}
+                </button>
+                
+                <button onClick={() => { onScrollToTop?.(); setShowPopup(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-base-200 text-xs">
+                  <ArrowUp className="size-3.5" /> Go to top
                 </button>
 
                 {/* Delete options */}

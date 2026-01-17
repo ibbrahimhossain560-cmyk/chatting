@@ -82,7 +82,7 @@ const messageSchema = new mongoose.Schema(
     // Message type for special handling
     messageType: {
       type: String,
-      enum: ["text", "image", "audio", "file", "sticker", "gif", "location"],
+      enum: ["text", "image", "audio", "file", "sticker", "gif", "location", "nickname_change", "system"],
       default: "text",
     },
     // File attachment support

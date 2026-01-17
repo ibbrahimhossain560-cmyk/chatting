@@ -81,11 +81,17 @@ const VideoCall = () => {
   // Set remote video/audio stream
   useEffect(() => {
     if (remoteStream) {
+      console.log("Setting remote stream with tracks:", remoteStream.getTracks().map(t => t.kind));
+      
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = remoteStream;
       }
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = remoteStream;
+        // Try to play audio (handle autoplay restrictions)
+        remoteAudioRef.current.play().catch(err => {
+          console.log("Audio autoplay failed, user interaction may be needed:", err);
+        });
       }
     }
   }, [remoteStream]);
@@ -128,8 +134,14 @@ const VideoCall = () => {
         className="fixed inset-0 z-50 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
         onClick={() => setShowControls(true)}
       >
-        {/* Hidden audio element for audio calls */}
-        <audio ref={remoteAudioRef} autoPlay playsInline hidden />
+        {/* Hidden audio element for audio calls - ensure it plays */}
+        <audio 
+          ref={remoteAudioRef} 
+          autoPlay 
+          playsInline 
+          controls={false}
+          style={{ display: 'none' }}
+        />
 
         {/* Main video area */}
         <div className="relative h-full w-full flex items-center justify-center overflow-hidden">

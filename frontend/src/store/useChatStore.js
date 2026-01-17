@@ -33,6 +33,10 @@ export const useChatStore = create((set, get) => ({
   // Search
   searchQuery: "",
   searchResults: [],
+  
+  // Nicknames
+  nicknames: {}, // { oderId: { myNicknameForThem, theirNicknameForMe } }
+  isNicknameLoading: false,
 
   getUsers: async () => {
     set({ isUsersLoading: true });
@@ -359,6 +363,33 @@ export const useChatStore = create((set, get) => ({
     socket.on("userLastSeen", (data) => {
       get().setUserLastSeen(data.userId, data.lastSeen);
     });
+
+    // Listen for nickname changes
+    socket.on("nicknameChanged", (data) => {
+      set((state) => ({
+        nicknames: {
+          ...state.nicknames,
+          [data.setBy]: {
+            ...state.nicknames[data.setBy],
+            theirNicknameForMe: data.nickname,
+          },
+        },
+      }));
+      toast(`${data.setBy === get().selectedUser?._id ? "They" : "Someone"} set a nickname for you`, { icon: "✏️" });
+    });
+
+    // Listen for nickname removals
+    socket.on("nicknameRemoved", (data) => {
+      set((state) => ({
+        nicknames: {
+          ...state.nicknames,
+          [data.setBy]: {
+            ...state.nicknames[data.setBy],
+            theirNicknameForMe: null,
+          },
+        },
+      }));
+    });
   },
 
   unsubscribeFromMessages: () => {
@@ -370,6 +401,77 @@ export const useChatStore = create((set, get) => ({
     socket.off("messageDeleted");
     socket.off("messageEdited");
     socket.off("userLastSeen");
+    socket.off("nicknameChanged");
+    socket.off("nicknameRemoved");
+  },
+
+  // ============ Nickname Functions ============
+
+  getConversationNicknames: async (userId) => {
+    set({ isNicknameLoading: true });
+    try {
+      const res = await axiosInstance.get(`/nicknames/conversation/${userId}`);
+      set((state) => ({
+        nicknames: {
+          ...state.nicknames,
+          [userId]: {
+            myNicknameForThem: res.data.myNicknameForThem,
+            theirNicknameForMe: res.data.theirNicknameForMe,
+          },
+        },
+        isNicknameLoading: false,
+      }));
+      return res.data;
+    } catch (error) {
+      console.log("Failed to get nicknames:", error);
+      set({ isNicknameLoading: false });
+      return null;
+    }
+  },
+
+  setNickname: async (userId, nickname) => {
+    try {
+      const res = await axiosInstance.post(`/nicknames/${userId}`, { nickname });
+      set((state) => ({
+        nicknames: {
+          ...state.nicknames,
+          [userId]: {
+            ...state.nicknames[userId],
+            myNicknameForThem: res.data.nickname,
+          },
+        },
+      }));
+      toast.success(res.data.message);
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to set nickname");
+      return false;
+    }
+  },
+
+  removeNickname: async (userId) => {
+    try {
+      await axiosInstance.delete(`/nicknames/${userId}`);
+      set((state) => ({
+        nicknames: {
+          ...state.nicknames,
+          [userId]: {
+            ...state.nicknames[userId],
+            myNicknameForThem: null,
+          },
+        },
+      }));
+      toast.success("Nickname removed");
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to remove nickname");
+      return false;
+    }
+  },
+
+  getNicknameForUser: (userId) => {
+    const { nicknames } = get();
+    return nicknames[userId]?.myNicknameForThem || null;
   },
 
   setSelectedUser: (selectedUser) => set({ selectedUser }),

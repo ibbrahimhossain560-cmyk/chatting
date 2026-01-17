@@ -298,7 +298,13 @@ export const useCallStore = create(
 
           peer.on("connect", () => {
             console.log("Peer connected!");
-            set({ callStatus: "ongoing", callStartTime: Date.now(), networkQuality: "good" });
+            // Only update if not already ongoing (to avoid resetting timer)
+            const currentStatus = get().callStatus;
+            if (currentStatus !== "ongoing") {
+              set({ callStatus: "ongoing", callStartTime: Date.now(), networkQuality: "good" });
+            } else {
+              set({ networkQuality: "good" });
+            }
             get().startConnectionMonitor();
           });
 
@@ -537,21 +543,28 @@ export const useCallStore = create(
         // Stop any ringtone/beep immediately
         stopRingtone();
         
-        // Start timer immediately when call is accepted (don't wait for connect)
-        if (callStatus === "calling") {
-          set({ 
-            callStatus: "ongoing", 
-            callStartTime: Date.now() 
-          });
-          get().startConnectionMonitor();
-        }
-        
         if (peer) {
           try {
+            // Signal peer first - this is critical for WebRTC connection
             peer.signal(signal);
+            console.log("Peer signaled successfully");
+            
+            // Update status to ongoing with timer
+            if (callStatus === "calling") {
+              set({ 
+                callStatus: "ongoing", 
+                callStartTime: Date.now() 
+              });
+            }
           } catch (e) {
             console.error("Error signaling peer:", e);
+            toast.error("Failed to connect call");
+            get().cleanupCall();
           }
+        } else {
+          console.error("No peer available to signal");
+          toast.error("Call connection failed");
+          get().cleanupCall();
         }
       },
 
