@@ -1,5 +1,6 @@
 import { useChatStore } from "../store/useChatStore";
-import { useEffect, useRef, useState } from "react";
+import { useCallStore } from "../store/useCallStore";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import ChatHeader from "./ChatHeader";
@@ -7,6 +8,7 @@ import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
 import MessageBubble from "./MessageBubble";
 import ForwardModal from "./ForwardModal";
+import CallMessage from "./CallMessage";
 import { useAuthStore } from "../store/useAuthStore";
 import { Search, X } from "lucide-react";
 
@@ -33,12 +35,35 @@ const ChatContainer = () => {
     searchResults,
     clearSearch,
   } = useChatStore();
+  const { lastCallInfo, clearLastCallInfo } = useCallStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
+  const messageRefs = useRef({});
   const [forwardMessage, setForwardMessage] = useState(null);
   const [showSearch, setShowSearch] = useState(false);
   const [playingAudio, setPlayingAudio] = useState(null);
+  const [displayedCallInfo, setDisplayedCallInfo] = useState(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null);
   const audioRefs = useRef({});
+
+  // Scroll to a specific message when tapping on reply
+  const scrollToMessage = useCallback((messageId) => {
+    const messageElement = messageRefs.current[messageId];
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Highlight the message briefly
+      setHighlightedMessageId(messageId);
+      setTimeout(() => setHighlightedMessageId(null), 2000);
+    }
+  }, []);
+
+  // Show last call info when it changes
+  useEffect(() => {
+    if (lastCallInfo && lastCallInfo.withUserId === selectedUser?._id) {
+      setDisplayedCallInfo(lastCallInfo);
+      clearLastCallInfo();
+    }
+  }, [lastCallInfo, selectedUser, clearLastCallInfo]);
 
   useEffect(() => {
     getMessages(selectedUser._id);
@@ -187,9 +212,21 @@ const ChatContainer = () => {
           <motion.div
             key={message._id}
             initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+            animate={{ 
+              opacity: 1, 
+              y: 0,
+              backgroundColor: highlightedMessageId === message._id ? "rgba(var(--p) / 0.2)" : "transparent",
+            }}
             transition={{ delay: index * 0.02 }}
-            ref={index === displayMessages.length - 1 ? messageEndRef : null}
+            ref={(el) => {
+              messageRefs.current[message._id] = el;
+              if (index === displayMessages.length - 1) {
+                messageEndRef.current = el;
+              }
+            }}
+            className={`rounded-lg transition-colors duration-300 ${
+              highlightedMessageId === message._id ? "ring-2 ring-primary/50" : ""
+            }`}
           >
             <MessageBubble
               message={message}
@@ -203,6 +240,7 @@ const ChatContainer = () => {
               onStar={toggleStarMessage}
               isStarred={starredMessages.includes(message._id)}
               onReaction={handleReaction}
+              onScrollToMessage={scrollToMessage}
               reactions={getMessageReactions(message._id)}
               readReceipt={readReceipts[selectedUser._id]}
               playingAudio={playingAudio}
@@ -211,6 +249,14 @@ const ChatContainer = () => {
             />
           </motion.div>
         ))}
+
+        {/* Display last call info */}
+        {displayedCallInfo && (
+          <CallMessage 
+            callInfo={displayedCallInfo} 
+            isOutgoing={displayedCallInfo.withUserId !== authUser._id} 
+          />
+        )}
 
         {/* Typing indicator */}
         <AnimatePresence>

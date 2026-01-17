@@ -4,16 +4,14 @@ import { useCallStore } from "../store/useCallStore";
 import { useEffect, useRef } from "react";
 
 const IncomingCall = () => {
-  const { callStatus, callType, caller, acceptCall, rejectCall } =
-    useCallStore();
+  const { callStatus, callType, caller, acceptCall, rejectCall } = useCallStore();
   const ringtoneRef = useRef(null);
 
   // Play ringtone when receiving call
   useEffect(() => {
     if (callStatus === "receiving") {
       // Create a simple ringtone using Web Audio API
-      const audioContext = new (window.AudioContext ||
-        window.webkitAudioContext)();
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
       const playRingtone = () => {
         const oscillator = audioContext.createOscillator();
@@ -26,10 +24,7 @@ const IncomingCall = () => {
         oscillator.type = "sine";
 
         gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(
-          0.01,
-          audioContext.currentTime + 0.5
-        );
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
 
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.5);
@@ -75,21 +70,16 @@ const IncomingCall = () => {
           initial={{ scale: 0.8, y: 50 }}
           animate={{ scale: 1, y: 0 }}
           exit={{ scale: 0.8, y: 50 }}
-          className="bg-gradient-to-br from-base-100 to-base-200 rounded-3xl p-8 shadow-2xl max-w-sm w-full"
+          className="bg-gradient-to-br from-base-100 to-base-200 rounded-3xl p-6 sm:p-8 shadow-2xl max-w-[90vw] sm:max-w-sm w-full"
         >
           {/* Caller info */}
-          <div className="flex flex-col items-center space-y-4">
+          <div className="flex flex-col items-center space-y-3 sm:space-y-4">
             <motion.div
-              animate={{
-                scale: [1, 1.05, 1],
-              }}
-              transition={{
-                repeat: Infinity,
-                duration: 2,
-              }}
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ repeat: Infinity, duration: 2 }}
               className="relative"
             >
-              <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-primary shadow-xl">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full overflow-hidden border-4 border-primary shadow-xl">
                 <img
                   src={caller?.profilePic || "/avatar.png"}
                   alt={caller?.fullName}
@@ -99,83 +89,76 @@ const IncomingCall = () => {
               {/* Pulsing ring animation */}
               <motion.div
                 className="absolute inset-0 rounded-full border-4 border-primary"
-                animate={{
-                  scale: [1, 1.5],
-                  opacity: [0.6, 0],
-                }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 1.5,
-                  ease: "easeOut",
-                }}
+                animate={{ scale: [1, 1.3], opacity: [0.6, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeOut" }}
               />
               <motion.div
                 className="absolute inset-0 rounded-full border-4 border-primary"
-                animate={{
-                  scale: [1, 1.5],
-                  opacity: [0.6, 0],
-                }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 1.5,
-                  ease: "easeOut",
-                  delay: 0.5,
-                }}
+                animate={{ scale: [1, 1.3], opacity: [0.6, 0] }}
+                transition={{ repeat: Infinity, duration: 1.5, ease: "easeOut", delay: 0.5 }}
               />
             </motion.div>
 
             <div className="text-center">
-              <h3 className="text-2xl font-bold">{caller?.fullName}</h3>
-              <div className="flex items-center justify-center gap-2 mt-2 text-base-content/70">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-bold truncate max-w-[200px] sm:max-w-[250px]">
+                {caller?.fullName}
+              </h3>
+              <div className="flex items-center justify-center gap-2 mt-1 text-base-content/70">
                 {callType === "video" ? (
-                  <Video className="w-5 h-5" />
+                  <>
+                    <Video className="w-4 h-4" />
+                    <span className="text-sm sm:text-base">Video Call</span>
+                  </>
                 ) : (
-                  <PhoneCall className="w-5 h-5" />
+                  <>
+                    <PhoneCall className="w-4 h-4" />
+                    <span className="text-sm sm:text-base">Audio Call</span>
+                  </>
                 )}
-                <span>
-                  Incoming {callType === "video" ? "Video" : "Audio"} Call
-                </span>
               </div>
             </div>
-          </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center justify-center gap-8 mt-10">
-            {/* Reject button */}
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleReject}
-              className="w-16 h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/30 transition-colors"
+            {/* Incoming call text with animation */}
+            <motion.p
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ repeat: Infinity, duration: 1.5 }}
+              className="text-sm text-base-content/60"
             >
-              <PhoneOff className="w-7 h-7" />
-            </motion.button>
+              Incoming call...
+            </motion.p>
 
-            {/* Accept button */}
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={handleAccept}
-              animate={{
-                boxShadow: [
-                  "0 0 0 0 rgba(34, 197, 94, 0.4)",
-                  "0 0 0 15px rgba(34, 197, 94, 0)",
-                ],
-              }}
-              transition={{
-                repeat: Infinity,
-                duration: 1.5,
-              }}
-              className="w-16 h-16 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center transition-colors"
-            >
-              <Phone className="w-7 h-7" />
-            </motion.button>
+            {/* Action buttons */}
+            <div className="flex items-center justify-center gap-6 sm:gap-8 mt-4 sm:mt-6 w-full">
+              {/* Reject button */}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleReject}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/30"
+              >
+                <PhoneOff className="w-6 h-6 sm:w-7 sm:h-7" />
+              </motion.button>
+
+              {/* Accept button */}
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleAccept}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-lg shadow-green-500/30"
+              >
+                {callType === "video" ? (
+                  <Video className="w-6 h-6 sm:w-7 sm:h-7" />
+                ) : (
+                  <Phone className="w-6 h-6 sm:w-7 sm:h-7" />
+                )}
+              </motion.button>
+            </div>
+
+            {/* Swipe hint for mobile */}
+            <p className="text-[10px] sm:text-xs text-base-content/40 mt-2">
+              Tap to answer or decline
+            </p>
           </div>
-
-          {/* Swipe hint for mobile */}
-          <p className="text-center text-sm text-base-content/50 mt-6">
-            Tap to answer or decline
-          </p>
         </motion.div>
       </motion.div>
     </AnimatePresence>

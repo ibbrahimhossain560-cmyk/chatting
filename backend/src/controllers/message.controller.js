@@ -28,7 +28,7 @@ export const getMessages = async (req, res) => {
       ],
       deletedForEveryone: { $ne: true },
     })
-      .populate("replyTo", "text image senderId")
+      .populate("replyTo", "_id text image senderId")
       .sort({ createdAt: 1 }); // Sort by timestamp ascending
 
     // Mark messages as read
@@ -83,7 +83,7 @@ export const sendMessage = async (req, res) => {
 
     // Populate replyTo if exists
     if (replyTo) {
-      await newMessage.populate("replyTo", "text image senderId");
+      await newMessage.populate("replyTo", "_id text image senderId");
     }
 
     const receiverSocketId = getReceiverSocketId(receiverId);

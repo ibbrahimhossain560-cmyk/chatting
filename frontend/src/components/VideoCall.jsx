@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useCallStore } from "../store/useCallStore";
+import { useCallStore, formatCallDuration } from "../store/useCallStore";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic,
@@ -105,15 +105,15 @@ const VideoCall = () => {
   const getNetworkIcon = () => {
     switch (networkQuality) {
       case "good":
-        return <SignalHigh className="w-4 h-4 text-green-400" />;
+        return <SignalHigh className="w-3 h-3 sm:w-4 sm:h-4 text-green-400" />;
       case "medium":
-        return <SignalMedium className="w-4 h-4 text-yellow-400" />;
+        return <SignalMedium className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />;
       case "poor":
-        return <SignalLow className="w-4 h-4 text-red-400" />;
+        return <SignalLow className="w-3 h-3 sm:w-4 sm:h-4 text-red-400" />;
       case "reconnecting":
-        return <WifiOff className="w-4 h-4 text-red-400 animate-pulse" />;
+        return <WifiOff className="w-3 h-3 sm:w-4 sm:h-4 text-red-400 animate-pulse" />;
       default:
-        return <Signal className="w-4 h-4 text-white/50" />;
+        return <Signal className="w-3 h-3 sm:w-4 sm:h-4 text-white/50" />;
     }
   };
 
@@ -125,9 +125,7 @@ const VideoCall = () => {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
-        className={`fixed inset-0 z-50 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 ${
-          isFullscreen ? "" : "sm:inset-4 sm:rounded-2xl sm:shadow-2xl"
-        }`}
+        className="fixed inset-0 z-50 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
         onClick={() => setShowControls(true)}
       >
         {/* Hidden audio element for audio calls */}
@@ -144,7 +142,7 @@ const VideoCall = () => {
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="flex flex-col items-center justify-center space-y-4 sm:space-y-6 p-4">
+            <div className="flex flex-col items-center justify-center space-y-3 sm:space-y-6 p-4 w-full max-w-sm mx-auto">
               <motion.div
                 animate={{
                   scale: callStatus === "calling" ? [1, 1.1, 1] : 1,
@@ -155,7 +153,7 @@ const VideoCall = () => {
                 }}
                 className="relative"
               >
-                <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl">
+                <div className="w-20 h-20 sm:w-28 sm:h-28 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white/20 shadow-2xl">
                   <img
                     src={otherUser?.profilePic || "/avatar.png"}
                     alt={otherUser?.fullName}
@@ -178,15 +176,15 @@ const VideoCall = () => {
                 )}
                 {isOnHold && (
                   <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center">
-                    <Pause className="w-10 h-10 text-white" />
+                    <Pause className="w-8 h-8 sm:w-10 sm:h-10 text-white" />
                   </div>
                 )}
               </motion.div>
               <div className="text-center">
-                <h3 className="text-xl sm:text-2xl md:text-3xl font-bold text-white">
+                <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-white truncate max-w-[200px] sm:max-w-[280px]">
                   {otherUser?.fullName}
                 </h3>
-                <p className="text-white/70 mt-1 sm:mt-2 text-sm sm:text-base">
+                <p className="text-white/70 mt-1 text-sm sm:text-base">
                   {callStatus === "calling"
                     ? "Calling..."
                     : callStatus === "reconnecting"
@@ -196,7 +194,7 @@ const VideoCall = () => {
                     : "Connecting..."}
                 </p>
                 {isOnHold && (
-                  <p className="text-yellow-400 mt-1 text-sm">Call on hold</p>
+                  <p className="text-yellow-400 mt-1 text-xs sm:text-sm">Call on hold</p>
                 )}
               </div>
             </div>
@@ -209,7 +207,7 @@ const VideoCall = () => {
               animate={{ opacity: 1, y: 0 }}
               drag
               dragMomentum={false}
-              className="absolute top-4 right-4 w-20 h-28 sm:w-28 sm:h-40 md:w-40 md:h-56 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 cursor-move"
+              className="absolute top-2 right-2 sm:top-4 sm:right-4 w-16 h-24 sm:w-24 sm:h-36 md:w-32 md:h-44 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 cursor-move"
             >
               <video
                 ref={localVideoRef}
@@ -220,7 +218,7 @@ const VideoCall = () => {
               />
               {isVideoOff && (
                 <div className="h-full w-full bg-gray-800 flex items-center justify-center">
-                  <VideoOff className="text-white/50 w-6 h-6 sm:w-8 sm:h-8" />
+                  <VideoOff className="text-white/50 w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
               )}
             </motion.div>
@@ -233,11 +231,11 @@ const VideoCall = () => {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="absolute top-4 left-4 flex items-center gap-2 sm:gap-3"
+                className="absolute top-2 left-2 sm:top-4 sm:left-4 flex items-center gap-1.5 sm:gap-2"
               >
                 {/* Call status badge */}
                 <div
-                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-full backdrop-blur-md text-xs sm:text-sm ${
+                  className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-full backdrop-blur-md text-[10px] sm:text-xs ${
                     callStatus === "ongoing"
                       ? "bg-green-500/20 text-green-400"
                       : callStatus === "reconnecting"
@@ -245,22 +243,22 @@ const VideoCall = () => {
                       : "bg-white/10 text-white"
                   }`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     {callStatus === "ongoing" ? (
                       <>
-                        <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full animate-pulse" />
                         <span className="font-medium">{callDuration}</span>
                       </>
                     ) : callStatus === "reconnecting" ? (
                       <>
-                        <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+                        <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-yellow-400 rounded-full animate-pulse" />
                         <span className="font-medium">Reconnecting...</span>
                       </>
                     ) : (
                       <>
-                        <Phone className="w-4 h-4 animate-pulse" />
-                        <span className="font-medium">
-                          {isVideoCall ? "Video" : "Audio"} Call
+                        <Phone className="w-3 h-3 sm:w-4 sm:h-4 animate-pulse" />
+                        <span className="font-medium hidden xs:inline">
+                          {isVideoCall ? "Video" : "Audio"}
                         </span>
                       </>
                     )}
@@ -268,152 +266,135 @@ const VideoCall = () => {
                 </div>
 
                 {/* Network quality indicator */}
-                <div className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-full backdrop-blur-md bg-black/30 flex items-center gap-1.5">
+                <div className="p-1.5 sm:px-2 sm:py-1.5 rounded-full backdrop-blur-md bg-black/30 flex items-center gap-1">
                   {getNetworkIcon()}
-                  <span className="text-xs text-white/70 hidden sm:inline">
-                    {networkQuality === "good" ? "Good" : networkQuality === "medium" ? "Fair" : networkQuality === "poor" ? "Poor" : "..."}
-                  </span>
                 </div>
 
                 {/* Low data mode indicator */}
                 {lowDataMode && (
-                  <div className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-full backdrop-blur-md bg-blue-500/20 flex items-center gap-1.5">
-                    <Zap className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs text-blue-400 hidden sm:inline">Low Data</span>
+                  <div className="p-1.5 sm:px-2 sm:py-1.5 rounded-full backdrop-blur-md bg-blue-500/20 flex items-center">
+                    <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-blue-400" />
                   </div>
                 )}
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Controls */}
+          {/* Controls - fully responsive */}
           <AnimatePresence>
             {showControls && (
               <motion.div
                 initial={{ y: 100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 100, opacity: 0 }}
-                className="absolute bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 w-full px-4 sm:px-0 sm:w-auto"
+                className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 md:p-6 safe-area-inset-bottom"
               >
-                <div className="flex items-center justify-center gap-2 sm:gap-4 p-3 sm:p-4 rounded-2xl backdrop-blur-xl bg-black/40 mx-auto max-w-fit">
-                  {/* Mute button */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={toggleMute}
-                    className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-colors ${
-                      isMuted
-                        ? "bg-red-500 text-white"
-                        : "bg-white/20 text-white hover:bg-white/30"
-                    }`}
-                  >
-                    {isMuted ? (
-                      <MicOff className="w-5 h-5 sm:w-6 sm:h-6" />
-                    ) : (
-                      <Mic className="w-5 h-5 sm:w-6 sm:h-6" />
-                    )}
-                  </motion.button>
-
-                  {/* Video toggle (only for video calls) */}
-                  {isVideoCall && (
+                <div className="flex flex-col items-center gap-2 sm:gap-3">
+                  {/* Main controls row */}
+                  <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-4 p-2.5 sm:p-3 md:p-4 rounded-2xl backdrop-blur-xl bg-black/40 w-full max-w-md mx-auto">
+                    {/* Mute button */}
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={toggleVideo}
-                      className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-colors ${
-                        isVideoOff
+                      onClick={toggleMute}
+                      className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+                        isMuted
                           ? "bg-red-500 text-white"
                           : "bg-white/20 text-white hover:bg-white/30"
                       }`}
                     >
-                      {isVideoOff ? (
-                        <VideoOff className="w-5 h-5 sm:w-6 sm:h-6" />
+                      {isMuted ? (
+                        <MicOff className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
                       ) : (
-                        <Video className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <Mic className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
                       )}
                     </motion.button>
-                  )}
 
-                  {/* Speaker toggle */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={toggleSpeaker}
-                    className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-colors ${
-                      !isSpeakerOn
-                        ? "bg-red-500 text-white"
-                        : "bg-white/20 text-white hover:bg-white/30"
-                    }`}
-                  >
-                    {isSpeakerOn ? (
-                      <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />
-                    ) : (
-                      <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" />
+                    {/* Video toggle (only for video calls) */}
+                    {isVideoCall && (
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={toggleVideo}
+                        className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+                          isVideoOff
+                            ? "bg-red-500 text-white"
+                            : "bg-white/20 text-white hover:bg-white/30"
+                        }`}
+                      >
+                        {isVideoOff ? (
+                          <VideoOff className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                        ) : (
+                          <Video className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                        )}
+                      </motion.button>
                     )}
-                  </motion.button>
 
-                  {/* End call button */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={endCall}
-                    className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/30"
-                  >
-                    <PhoneOff className="w-6 h-6 sm:w-7 sm:h-7" />
-                  </motion.button>
-
-                  {/* Hold button */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={toggleHold}
-                    className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center transition-colors ${
-                      isOnHold
-                        ? "bg-yellow-500 text-white"
-                        : "bg-white/20 text-white hover:bg-white/30"
-                    }`}
-                  >
-                    {isOnHold ? (
-                      <Play className="w-5 h-5 sm:w-6 sm:h-6" />
-                    ) : (
-                      <Pause className="w-5 h-5 sm:w-6 sm:h-6" />
-                    )}
-                  </motion.button>
-
-                  {/* Switch camera (only for video calls) */}
-                  {isVideoCall && (
+                    {/* Speaker toggle */}
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.95 }}
-                      onClick={switchCamera}
-                      className="w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center"
+                      onClick={toggleSpeaker}
+                      className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+                        !isSpeakerOn
+                          ? "bg-red-500 text-white"
+                          : "bg-white/20 text-white hover:bg-white/30"
+                      }`}
                     >
-                      <SwitchCamera className="w-5 h-5 sm:w-6 sm:h-6" />
+                      {isSpeakerOn ? (
+                        <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                      ) : (
+                        <VolumeX className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                      )}
                     </motion.button>
-                  )}
 
-                  {/* Fullscreen toggle */}
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setIsFullscreen(!isFullscreen)}
-                    className="w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center hidden sm:flex"
-                  >
-                    {isFullscreen ? (
-                      <Minimize2 className="w-5 h-5 sm:w-6 sm:h-6" />
-                    ) : (
-                      <Maximize2 className="w-5 h-5 sm:w-6 sm:h-6" />
+                    {/* End call button */}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={endCall}
+                      className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-500/30 flex-shrink-0"
+                    >
+                      <PhoneOff className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
+                    </motion.button>
+
+                    {/* Hold button */}
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={toggleHold}
+                      className={`w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center transition-colors flex-shrink-0 ${
+                        isOnHold
+                          ? "bg-yellow-500 text-white"
+                          : "bg-white/20 text-white hover:bg-white/30"
+                      }`}
+                    >
+                      {isOnHold ? (
+                        <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                      ) : (
+                        <Pause className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                      )}
+                    </motion.button>
+
+                    {/* Switch camera (only for video calls) */}
+                    {isVideoCall && (
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={switchCamera}
+                        className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center flex-shrink-0"
+                      >
+                        <SwitchCamera className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                      </motion.button>
                     )}
-                  </motion.button>
-                </div>
+                  </div>
 
-                {/* Low data mode toggle */}
-                <div className="mt-3 flex justify-center">
+                  {/* Low data mode toggle */}
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => setLowDataMode(!lowDataMode)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    className={`px-3 py-1.5 rounded-full text-[10px] sm:text-xs font-medium transition-colors ${
                       lowDataMode
                         ? "bg-blue-500/30 text-blue-300"
                         : "bg-white/10 text-white/60 hover:bg-white/20"
@@ -421,7 +402,7 @@ const VideoCall = () => {
                   >
                     <div className="flex items-center gap-1.5">
                       <Zap className="w-3 h-3" />
-                      {lowDataMode ? "Low Data Mode On" : "Enable Low Data Mode"}
+                      {lowDataMode ? "Low Data On" : "Low Data"}
                     </div>
                   </motion.button>
                 </div>

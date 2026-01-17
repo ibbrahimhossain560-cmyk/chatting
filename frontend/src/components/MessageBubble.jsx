@@ -28,6 +28,7 @@ const MessageBubble = ({
   playingAudio,
   onPlayAudio,
   audioRef,
+  onScrollToMessage,
 }) => {
   const [showPopup, setShowPopup] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
@@ -164,9 +165,17 @@ const MessageBubble = ({
             : "bg-base-200 text-base-content"
         } shadow-sm max-w-[80%] sm:max-w-[70%]`}
       >
-        {/* Reply preview */}
+        {/* Reply preview - clickable to scroll to original */}
         {message.replyTo && (
-          <div className="mb-1.5 p-1.5 bg-black/10 rounded border-l-2 border-primary/50 text-xs">
+          <div 
+            className="mb-1.5 p-1.5 bg-black/10 rounded border-l-2 border-primary/50 text-xs cursor-pointer hover:bg-black/20 active:bg-black/30 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onScrollToMessage && message.replyTo._id) {
+                onScrollToMessage(message.replyTo._id);
+              }
+            }}
+          >
             <p className="truncate opacity-70 max-w-[200px]">
               {message.replyTo.text || (message.replyTo.image ? "📷 Photo" : "🎤 Voice")}
             </p>
