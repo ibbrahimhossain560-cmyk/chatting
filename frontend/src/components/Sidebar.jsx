@@ -4,7 +4,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
 import { Users, Bell, BellOff, Search, X, Archive, Trash2, Pin, PinOff, VolumeX, Volume2, MoreVertical, ArchiveRestore } from "lucide-react";
 import { notificationManager } from "../lib/notifications";
-import { motion, AnimatePresence, useMotionValue, useTransform, useAnimation } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Badge from "./Badge";
 import toast from "react-hot-toast";
 
@@ -15,7 +15,7 @@ const Sidebar = () => {
     selectedUser, 
     setSelectedUser, 
     isUsersLoading,
-    archivedUsers,
+    archivedUsers = [],
     archiveChat,
     unarchiveChat,
     deleteChat,
@@ -23,11 +23,11 @@ const Sidebar = () => {
     unpinChat,
     muteChat,
     unmuteChat,
-    pinnedUsers,
-    mutedUsers,
+    pinnedUsers = [],
+    mutedUsers = [],
   } = useChatStore();
 
-  const { onlineUsers } = useAuthStore();
+  const { onlineUsers = [] } = useAuthStore();
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -158,22 +158,22 @@ const Sidebar = () => {
   };
 
   // Filter users based on archived state
-  const filteredUsers = users.filter((user) => {
-    const isArchived = archivedUsers.includes(user._id);
+  const filteredUsers = (users || []).filter((user) => {
+    const isArchived = archivedUsers?.includes(user._id) || false;
     if (showArchived !== isArchived) return false;
     
-    const matchesOnline = showOnlineOnly ? onlineUsers.includes(user._id) : true;
-    const matchesSearch = user.fullName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesOnline = showOnlineOnly ? onlineUsers?.includes(user._id) : true;
+    const matchesSearch = user.fullName?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesOnline && matchesSearch;
   });
 
   // Sort users: pinned first, then by name
   const sortedUsers = [...filteredUsers].sort((a, b) => {
-    const aPinned = pinnedUsers.includes(a._id);
-    const bPinned = pinnedUsers.includes(b._id);
+    const aPinned = pinnedUsers?.includes(a._id) || false;
+    const bPinned = pinnedUsers?.includes(b._id) || false;
     if (aPinned && !bPinned) return -1;
     if (!aPinned && bPinned) return 1;
-    return a.fullName.localeCompare(b.fullName);
+    return (a.fullName || "").localeCompare(b.fullName || "");
   });
 
   if (isUsersLoading) return <SidebarSkeleton />;
@@ -347,7 +347,7 @@ const Sidebar = () => {
                 onClick={() => handlePin(contextMenu.user._id)}
                 className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-base-200 transition-colors"
               >
-                {pinnedUsers.includes(contextMenu.user._id) ? (
+                {pinnedUsers?.includes(contextMenu.user._id) ? (
                   <>
                     <PinOff className="size-4 text-base-content/70" />
                     <span>Unpin chat</span>
@@ -365,7 +365,7 @@ const Sidebar = () => {
                 onClick={() => handleMute(contextMenu.user._id)}
                 className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-base-200 transition-colors"
               >
-                {mutedUsers.includes(contextMenu.user._id) ? (
+                {mutedUsers?.includes(contextMenu.user._id) ? (
                   <>
                     <Volume2 className="size-4 text-base-content/70" />
                     <span>Unmute notifications</span>
@@ -454,111 +454,89 @@ const Sidebar = () => {
   );
 };
 
-// Swipeable User Item Component
+// Simple User Item Component (no swipe - simpler and more reliable)
 const SwipeableUserItem = ({
   user,
   index,
   selectedUser,
   setSelectedUser,
-  onlineUsers,
-  pinnedUsers,
-  mutedUsers,
-  archivedUsers,
+  onlineUsers = [],
+  pinnedUsers = [],
+  mutedUsers = [],
+  archivedUsers = [],
   showArchived,
   onContextMenu,
   onLongPress,
   onArchive,
   onUnarchive,
 }) => {
-  const x = useMotionValue(0);
-  const controls = useAnimation();
-  const [isDragging, setIsDragging] = useState(false);
   const longPressTimer = useRef(null);
-  const isPinned = pinnedUsers.includes(user._id);
-  const isMuted = mutedUsers.includes(user._id);
+  const touchStartPos = useRef({ x: 0, y: 0 });
+  const [isLongPressing, setIsLongPressing] = useState(false);
+  const isPinned = pinnedUsers?.includes(user._id) || false;
+  const isMuted = mutedUsers?.includes(user._id) || false;
 
-  // Transform for background color based on swipe direction
-  const bgColor = useTransform(
-    x,
-    [-100, 0, 100],
-    showArchived 
-      ? ["rgb(34, 197, 94)", "transparent", "rgb(239, 68, 68)"]
-      : ["rgb(245, 158, 11)", "transparent", "rgb(239, 68, 68)"]
-  );
-
-  const handleDragEnd = async () => {
-    const xVal = x.get();
-    if (xVal < -80) {
-      // Swipe left - archive/unarchive
-      if (showArchived) {
-        await onUnarchive(user._id);
-      } else {
-        await onArchive(user._id);
-      }
-    }
-    controls.start({ x: 0 });
+  const handleTouchStart = (e) => {
+    touchStartPos.current = {
+      x: e.touches?.[0]?.clientX || e.clientX || 0,
+      y: e.touches?.[0]?.clientY || e.clientY || 0,
+    };
+    setIsLongPressing(false);
+    longPressTimer.current = setTimeout(() => {
+      setIsLongPressing(true);
+      if (navigator.vibrate) navigator.vibrate(50);
+      onLongPress(user);
+    }, 500);
   };
 
-  const handleTouchStart = () => {
-    longPressTimer.current = setTimeout(() => {
-      if (!isDragging) {
-        onLongPress(user);
+  const handleTouchMove = (e) => {
+    const currentX = e.touches?.[0]?.clientX || e.clientX || 0;
+    const currentY = e.touches?.[0]?.clientY || e.clientY || 0;
+    const diffX = Math.abs(currentX - touchStartPos.current.x);
+    const diffY = Math.abs(currentY - touchStartPos.current.y);
+    
+    // Cancel long press if user moves finger
+    if (diffX > 10 || diffY > 10) {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
       }
-    }, 500);
+    }
   };
 
   const handleTouchEnd = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
     }
+  };
+
+  const handleClick = () => {
+    // Don't open chat if we just did a long press
+    if (isLongPressing) {
+      setIsLongPressing(false);
+      return;
+    }
+    setSelectedUser(user);
   };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: -100 }}
+      exit={{ opacity: 0, y: -10 }}
       transition={{ delay: index * 0.03 }}
-      className="relative overflow-hidden"
+      className="relative"
     >
-      {/* Background action indicator */}
-      <motion.div
-        className="absolute inset-0 flex items-center justify-end px-4"
-        style={{ backgroundColor: bgColor }}
-      >
-        {showArchived ? (
-          <ArchiveRestore className="size-6 text-white" />
-        ) : (
-          <Archive className="size-6 text-white" />
-        )}
-      </motion.div>
-
-      {/* Swipeable content */}
-      <motion.button
-        drag="x"
-        dragConstraints={{ left: -100, right: 0 }}
-        dragElastic={0.1}
-        onDragStart={() => setIsDragging(true)}
-        onDragEnd={handleDragEnd}
-        onDrag={() => {
-          if (longPressTimer.current) {
-            clearTimeout(longPressTimer.current);
-          }
-        }}
-        animate={controls}
-        style={{ x }}
+      <button
         onContextMenu={(e) => onContextMenu(e, user)}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onMouseDown={handleTouchStart}
         onMouseUp={handleTouchEnd}
         onMouseLeave={handleTouchEnd}
-        onClick={() => {
-          if (!isDragging) {
-            setSelectedUser(user);
-          }
-          setIsDragging(false);
-        }}
+        onClick={handleClick}
         className={`
           w-full p-3 lg:p-4 flex items-center gap-3 bg-base-100
           hover:bg-base-200/70 transition-all duration-200
@@ -617,7 +595,7 @@ const SwipeableUserItem = ({
         >
           <MoreVertical className="size-4 text-base-content/60" />
         </button>
-      </motion.button>
+      </button>
     </motion.div>
   );
 };

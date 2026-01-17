@@ -59,13 +59,14 @@ const ChatContainer = () => {
 
   // Scroll to the first message (top of chat)
   const scrollToTop = useCallback(() => {
-    const firstMessageId = sortedMessages[0]?._id;
-    if (firstMessageId && messageRefs.current[firstMessageId]) {
-      messageRefs.current[firstMessageId].scrollIntoView({ behavior: "smooth", block: "start" });
-      setHighlightedMessageId(firstMessageId);
+    const keys = Object.keys(messageRefs.current);
+    if (keys.length > 0) {
+      const firstKey = keys[0];
+      messageRefs.current[firstKey]?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setHighlightedMessageId(firstKey);
       setTimeout(() => setHighlightedMessageId(null), 2000);
     }
-  }, [sortedMessages]);
+  }, []);
 
   // Show last call info when it changes
   useEffect(() => {
@@ -76,10 +77,12 @@ const ChatContainer = () => {
   }, [lastCallInfo, selectedUser, clearLastCallInfo]);
 
   useEffect(() => {
-    getMessages(selectedUser._id);
-    subscribeToMessages();
+    if (selectedUser?._id) {
+      getMessages(selectedUser._id);
+      subscribeToMessages();
+    }
     return () => unsubscribeFromMessages();
-  }, [selectedUser._id, getMessages, subscribeToMessages, unsubscribeFromMessages]);
+  }, [selectedUser?._id, getMessages, subscribeToMessages, unsubscribeFromMessages]);
 
   useEffect(() => {
     if (messages.length > 0 && selectedUser) {
@@ -133,6 +136,11 @@ const ChatContainer = () => {
     new Date(a.createdAt) - new Date(b.createdAt)
   );
   const displayMessages = searchQuery ? sortedSearchResults : sortedMessages;
+
+  // Early return if no selected user (after all hooks)
+  if (!selectedUser) {
+    return null;
+  }
 
   if (isMessagesLoading) {
     return (

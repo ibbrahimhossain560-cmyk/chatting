@@ -11,19 +11,17 @@ import { useState, useEffect } from "react";
 
 const ChatHeader = () => {
   const { selectedUser, setSelectedUser, nicknames, getConversationNicknames } = useChatStore();
-  const { onlineUsers } = useAuthStore();
+  const { onlineUsers = [] } = useAuthStore();
   const { initiateCall, callStatus } = useCallStore();
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showNicknameModal, setShowNicknameModal] = useState(false);
 
-  // Early return if no selected user
-  if (!selectedUser) return null;
-
-  const isOnline = onlineUsers.includes(selectedUser._id);
-  const isInCall = callStatus !== "idle";
-  
   // Get nickname for this user (safely)
-  const userNickname = nicknames?.[selectedUser._id]?.myNicknameForThem || null;
+  const userNickname = selectedUser ? (nicknames?.[selectedUser._id]?.myNicknameForThem || null) : null;
+  
+  // Calculate isOnline and isInCall
+  const isOnline = selectedUser ? onlineUsers.includes(selectedUser._id) : false;
+  const isInCall = callStatus !== "idle";
 
   // Fetch nicknames when selected user changes (wrapped in try-catch)
   useEffect(() => {
@@ -37,7 +35,10 @@ const ChatHeader = () => {
       }
     };
     fetchNicknames();
-  }, [selectedUser?._id]);
+  }, [selectedUser?._id, getConversationNicknames]);
+
+  // Early return if no selected user - AFTER all hooks
+  if (!selectedUser) return null;
 
   const handleAudioCall = () => {
     if (!isOnline) {
