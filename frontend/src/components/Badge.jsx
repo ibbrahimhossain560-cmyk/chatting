@@ -248,7 +248,7 @@ const Badge = ({ badgeType, size = "sm", showTooltip = true, className = "" }) =
       whileHover={{ scale: 1.2 }}
       className={`inline-flex items-center justify-center flex-shrink-0 ${sizeClasses[size]} ${className}`}
       title={showTooltip ? badge.name : undefined}
-      style={{ minWidth: sizeClasses[size].split(" ")[0].replace("w-", "") + "rem" }}
+      style={{ padding: 0, margin: 0, lineHeight: 0 }}
     >
       {badge.getIcon()}
     </motion.div>

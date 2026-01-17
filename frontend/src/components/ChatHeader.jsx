@@ -79,12 +79,12 @@ const ChatHeader = () => {
 
             {/* User info - name and badge directly together */}
             <div className="min-w-0 flex-1">
-              <div className="flex items-center">
-                <h3 className="font-medium text-sm sm:text-base truncate max-w-[100px] sm:max-w-[160px] text-base-content">
+              <div className="flex items-center gap-0">
+                <h3 className="font-medium text-sm sm:text-base truncate max-w-[100px] sm:max-w-[160px] text-base-content leading-none">
                   {selectedUser.fullName}
                 </h3>
                 {selectedUser.badgeType && selectedUser.badgeType !== "none" && (
-                  <Badge badgeType={selectedUser.badgeType} size="sm" className="ml-0.5" />
+                  <Badge badgeType={selectedUser.badgeType} size="sm" className="-ml-0.5" />
                 )}
               </div>
               <div className="flex items-center gap-1">

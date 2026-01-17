@@ -1,60 +1,21 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, PhoneOff, Video, PhoneCall } from "lucide-react";
 import { useCallStore } from "../store/useCallStore";
-import { useEffect, useRef } from "react";
 
 const IncomingCall = () => {
   const { callStatus, callType, caller, acceptCall, rejectCall } = useCallStore();
-  const ringtoneRef = useRef(null);
 
-  // Play ringtone when receiving call
-  useEffect(() => {
-    if (callStatus === "receiving") {
-      // Create a simple ringtone using Web Audio API
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-      const playRingtone = () => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        oscillator.frequency.value = 440;
-        oscillator.type = "sine";
-
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
-      };
-
-      const ringtoneInterval = setInterval(playRingtone, 1000);
-      ringtoneRef.current = { interval: ringtoneInterval, context: audioContext };
-
-      return () => {
-        clearInterval(ringtoneInterval);
-        audioContext.close();
-      };
-    }
-  }, [callStatus]);
+  // Ringtone is now handled by useCallStore - no duplicate audio here
 
   if (callStatus !== "receiving") return null;
 
   const handleAccept = () => {
-    if (ringtoneRef.current) {
-      clearInterval(ringtoneRef.current.interval);
-      ringtoneRef.current.context.close();
-    }
+    // useCallStore.acceptCall() will stop the ringtone
     acceptCall();
   };
 
   const handleReject = () => {
-    if (ringtoneRef.current) {
-      clearInterval(ringtoneRef.current.interval);
-      ringtoneRef.current.context.close();
-    }
+    // useCallStore.rejectCall() will stop the ringtone
     rejectCall();
   };
 

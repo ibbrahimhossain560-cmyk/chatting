@@ -181,8 +181,21 @@ export const useCallStore = create(
       maxReconnectAttempts: 5,
       _monitorInterval: null,
       lastCallInfo: null,
+      callHistory: [],
 
       setLowDataMode: (enabled) => set({ lowDataMode: enabled }),
+      
+      // Add call to history
+      addCallToHistory: (callInfo) => {
+        const { callHistory } = get();
+        const newHistory = [
+          { ...callInfo, id: Date.now() },
+          ...callHistory
+        ].slice(0, 50); // Keep last 50 calls
+        set({ callHistory: newHistory });
+      },
+      
+      clearCallHistory: () => set({ callHistory: [] }),
 
       // Handle incoming call from socket
       handleIncomingCall: (data) => {
@@ -454,16 +467,23 @@ export const useCallStore = create(
         
         const otherUser = receiver || caller;
         
-        // Save last call info for chat display
-        if (callDuration > 0 && otherUser) {
-          set({
-            lastCallInfo: {
-              duration: callDuration,
-              type: callType,
-              endedAt: new Date().toISOString(),
-              withUserId: otherUser._id,
-            }
-          });
+        // Save last call info for chat display and add to history
+        if (otherUser) {
+          const callInfo = {
+            duration: callDuration,
+            type: callType,
+            endedAt: new Date().toISOString(),
+            withUserId: otherUser._id,
+            withUserName: otherUser.fullName,
+            withUserPic: otherUser.profilePic,
+            wasCaller: !!receiver, // true if we initiated the call
+          };
+          set({ lastCallInfo: callInfo });
+          
+          // Add to persistent call history
+          if (callDuration > 0) {
+            get().addCallToHistory(callInfo);
+          }
         }
         
         if (_monitorInterval) {
@@ -512,7 +532,20 @@ export const useCallStore = create(
 
       handleCallAccepted: (signal) => {
         console.log("Call accepted, signaling peer");
-        const { peer } = get();
+        const { peer, callStatus } = get();
+        
+        // Stop any ringtone/beep immediately
+        stopRingtone();
+        
+        // Start timer immediately when call is accepted (don't wait for connect)
+        if (callStatus === "calling") {
+          set({ 
+            callStatus: "ongoing", 
+            callStartTime: Date.now() 
+          });
+          get().startConnectionMonitor();
+        }
+        
         if (peer) {
           try {
             peer.signal(signal);
@@ -751,6 +784,7 @@ export const useCallStore = create(
       name: "call-storage",
       partialize: (state) => ({
         lastCallInfo: state.lastCallInfo,
+        callHistory: state.callHistory,
       }),
     }
   )
